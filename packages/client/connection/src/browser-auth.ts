@@ -18,6 +18,8 @@ const COOKIE_PAYLOAD_VERSION = 1
 const STORED_SECRET_VERSION = 1
 const BASE64URL_PATTERN = /^[A-Za-z0-9_-]*$/
 const PROCESS_LAUNCH_TOKENS = new WeakMap<object, string>()
+/** Canonical hostnames whose browser sessions may skip launch-token exchange. */
+const LOOPBACK_HOSTNAMES = new Set(['127.0.0.1', 'localhost', '[::1]'])
 
 interface StoredSecretPayload {
   readonly version: typeof STORED_SECRET_VERSION
@@ -74,6 +76,16 @@ function requestAuthority(headers: ConnectionTrustRequest['headers']): string | 
     return new URL(`http://${host}`).host
   } catch {
     return undefined
+  }
+}
+
+/** Whether an authority reaches this process over the loopback interface. */
+function isLoopbackAuthority(authority: string | undefined): boolean {
+  if (authority === undefined) return false
+  try {
+    return LOOPBACK_HOSTNAMES.has(new URL(`http://${authority}`).hostname)
+  } catch {
+    return false
   }
 }
 
@@ -190,6 +202,7 @@ export class BrowserAuth {
     processOwner: object,
     private readonly secret: Buffer,
     maxAgeDays: number,
+    private readonly trustLoopback: boolean,
   ) {
     this.launchToken = processLaunchToken(processOwner)
     this.maxAgeMilliseconds = maxAgeDays * DAY_MILLISECONDS
@@ -205,14 +218,16 @@ export class BrowserAuth {
    * @param processOwner - root application context retaining one token across Connection reloads.
    * @param credentials - persistent credential provider for the Web profile.
    * @param maxAgeDays - positive absolute browser-cookie lifetime in days.
+   * @param trustLoopback - serve the index to any loopback request without the launch token or cookie.
    * @returns initialized authentication owner with the process owner's launch token.
    */
   static async create(
     processOwner: object,
     credentials: CredentialProvider,
     maxAgeDays: number,
+    trustLoopback = false,
   ): Promise<BrowserAuth> {
-    return new BrowserAuth(processOwner, await initializeSecret(credentials), maxAgeDays)
+    return new BrowserAuth(processOwner, await initializeSecret(credentials), maxAgeDays, trustLoopback)
   }
 
   /**
@@ -240,6 +255,7 @@ export class BrowserAuth {
   authorizeIndex(req: ConnectionIndexRequest, res: ConnectionIndexResponse): boolean {
     /* v8 ignore next -- node:http always supplies url on server requests. */
     const url = new URL(req.url ?? '/', 'http://dsh.invalid')
+    if (this.trustLoopback && isLoopbackAuthority(requestAuthority(req.headers))) return true
     const tokens = url.searchParams.getAll(TOKEN_QUERY)
     if (tokens.length > 0) {
       const authority = requestAuthority(req.headers)

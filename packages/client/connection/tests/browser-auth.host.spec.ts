@@ -55,8 +55,9 @@ function createAuth(
   store: RecordCredentials,
   maxAgeDays = 30,
   processOwner: object = {},
+  trustLoopback = false,
 ): Promise<BrowserAuth> {
-  return BrowserAuth.create(processOwner, credentials(store), maxAgeDays)
+  return BrowserAuth.create(processOwner, credentials(store), maxAgeDays, trustLoopback)
 }
 
 function request(url: string, authority = '127.0.0.1:3080', init?: {
@@ -165,6 +166,24 @@ describe('BrowserAuth', () => {
         ? undefined
         : 'dsh web authentication required; reopen the URL printed by dsh web.\n')
     }
+  })
+
+  it('trustLoopback serves loopback index requests without a token or cookie', async () => {
+    const open = await createAuth(new RecordCredentials(), 30, {}, true)
+    for (const authority of ['127.0.0.1:3080', 'localhost:3080', '[::1]:3080']) {
+      const allowed = response()
+      expect(open.authorizeIndex(request('/', authority), allowed.value)).toBe(true)
+      expect(allowed.state).toEqual({})
+    }
+    for (const authority of ['192.168.1.10:3080', '127.0.0.1.evil.example:3080']) {
+      const denied = response()
+      expect(open.authorizeIndex(request('/', authority), denied.value)).toBe(false)
+      expect(denied.state.status).toBe(401)
+    }
+    const closed = await createAuth(new RecordCredentials())
+    const denied = response()
+    expect(closed.authorizeIndex(request('/'), denied.value)).toBe(false)
+    expect(denied.state.status).toBe(401)
   })
 
   it('rejects tampering, expiry, future issuance, and a longer lifetime than configured', async () => {
