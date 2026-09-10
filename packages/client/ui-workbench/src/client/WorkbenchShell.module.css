@@ -1,0 +1,69 @@
+/* The frame-wide workbench page surface: a full-bleed panel inside the shell's
+   overlay layer. Every color carries a fallback so the page stays legible under
+   a theme that redefines the surface tokens. */
+
+.root {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--dsh-bg, #f8f7fb);
+  color: var(--dsh-fg, #1f2329);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 26px 40px 18px;
+  border-bottom: 1px solid var(--dsh-border, #eceef2);
+  background: var(--dsh-surface, #ffffff);
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--dsh-fg-muted, #8a8f99);
+}
+
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.06));
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px 40px 40px;
+}

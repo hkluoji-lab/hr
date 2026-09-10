@@ -8,6 +8,10 @@ export type AgentPresetSettingsKey =
   | 'presetPtcName' | 'presetPtcDescription'
   | 'presetMinimalName' | 'presetMinimalDescription'
   | 'presetCordisName' | 'presetCordisDescription'
+  | 'presetSecretaryName' | 'presetSecretaryDescription'
+  | 'presetAccountantName' | 'presetAccountantDescription'
+  | 'presetLegalName' | 'presetLegalDescription'
+  | 'presetAuditName' | 'presetAuditDescription'
   | 'duplicate' | 'duplicateUnavailable' | 'delete' | 'presetId' | 'presetIdPlaceholder' | 'copyOf'
   | 'displayName' | 'displayNamePlaceholder'
   | 'inUse' | 'noDescription' | 'builtInGroup' | 'customGroup'
@@ -43,6 +47,18 @@ export const en: Record<AgentPresetSettingsKey, string> = {
   presetCordisName: 'Creator mode',
   presetCordisDescription:
     'Built for creating custom agent presets, with all Standard mode capabilities plus runtime inspection, plugin experiments, and preset-authoring guidance.',
+  presetSecretaryName: 'AI secretary',
+  presetSecretaryDescription:
+    'Assistant agent for schedules, meeting notes, and routine follow-ups.',
+  presetAccountantName: 'AI accountant',
+  presetAccountantDescription:
+    'Bookkeeping agent for expense reconciliation and financial summaries.',
+  presetLegalName: 'AI legal counsel',
+  presetLegalDescription:
+    'Legal agent for contract review, clause comparison, and compliance checks.',
+  presetAuditName: 'AI auditor',
+  presetAuditDescription:
+    'Audit agent for sampling records, cross-checking figures, and reporting risks.',
   duplicate: 'Duplicate',
   duplicateUnavailable: 'This deployment has no writable preset directory',
   delete: 'Delete',
@@ -101,6 +117,14 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
   presetMinimalDescription: '仅提供持久 bash 与 str_replace_editor 的双工具编码 Agent。',
   presetCordisName: '创造模式',
   presetCordisDescription: '用于创建自定义 Agent preset：具备标准模式的全部能力，并提供运行时检查、插件实验和 preset 创作指导。',
+  presetSecretaryName: 'AI 秘书',
+  presetSecretaryDescription: '负责日程、纪要与事务性跟进的助理型 Agent。',
+  presetAccountantName: 'AI 会计',
+  presetAccountantDescription: '负责账目整理、报销核对与财务汇总的核算型 Agent。',
+  presetLegalName: 'AI 法务',
+  presetLegalDescription: '负责合同审查、条款比对与合规检查的法务型 Agent。',
+  presetAuditName: 'AI 审计',
+  presetAuditDescription: '负责凭证抽查、数据核对与风险提示的审计型 Agent。',
   duplicate: '复制',
   duplicateUnavailable: '此部署未配置可写的预设目录',
   delete: '删除',

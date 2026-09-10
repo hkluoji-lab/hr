@@ -121,6 +121,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   web: 'web.md',
   workflowEngine: 'workflow.md',
   webhookRuntime: 'webhook.md',
+  workbench: 'workbench.md',
   workspaceRegistry: 'workspace.md',
   workspaceController: 'workspace.md',
   workspaceFiles: 'workspace.md',
@@ -178,6 +179,7 @@ export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
   resources: 'client-side resource model (protocol providers, pins, live sources) — packages/client/resources/README.md owns the API',
   sidebarRight: 'client-side right-Sidebar navigation face — packages/client/ui-sidebar-right/README.md owns the API',
   sidebarRightTabs: 'client-side right-Sidebar tab-type registry — packages/client/ui-sidebar-right/README.md owns the API',
+  sessionDeliverables: 'client-side session-wide produced-file fold — packages/client/ui-deliverables/README.md owns the API',
 }
 
 /**
@@ -756,6 +758,9 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   SessionForkSource: 'service-local fork input is owned by packages/core/session/src/index.ts',
   SubagentRunEndInfo: 'event payload contract is owned by packages/subagent/subagent/src/types.ts',
   SubagentRunInfo: 'event payload contract is owned by packages/subagent/subagent/src/types.ts',
+  WorkbenchCreditGrant: 'Remote grant result is owned by packages/workbench/workbench/README.md',
+  WorkbenchLedger: 'Remote ledger page is owned by packages/workbench/workbench/README.md',
+  WorkbenchSnapshot: 'Remote snapshot payload is owned by packages/workbench/workbench/README.md',
   WorkflowAgentEndInfo: 'event-local snapshot is owned by packages/workflow/workflow/src/index.ts',
   WorkflowAgentInfo: 'event-local snapshot is owned by packages/workflow/workflow/src/index.ts',
   WorkflowResultInfo: 'event-local snapshot is owned by packages/workflow/workflow/src/index.ts',

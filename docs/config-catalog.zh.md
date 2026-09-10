@@ -363,6 +363,13 @@ export interface ConnectionConfig {
   cookieMaxAgeDays?: number
   /** Maximum buffered JSON body for every `/api` request. Default: 300 MiB. */
   maxRequestBodyBytes?: number
+  /**
+   * Serve the index to any loopback request without the launch token or cookie.
+   * Enables plain `http://127.0.0.1:<port>/` access at the cost of trusting
+   * every local process's browser. The /api trust fence still applies.
+   * Default: false.
+   */
+  trustLoopback?: boolean
 }
 
 /** Timing for generation readiness and automatic reconnection. */
@@ -3392,6 +3399,24 @@ export interface Config {
 
 来源：[`packages/webhook/webhook-github/src/index.ts:17`](../packages/webhook/webhook-github/src/index.ts)
 
+<a id="deepseek-aidsh-workbench"></a>
+
+## `@deepseek-ai/dsh-workbench`
+
+需要：`storageDomain` · `agentPresets` · `sessions` · `sessionProjections`
+
+```ts config-catalog
+/** The user-writable plugin config. */
+export interface Config {
+  /** Balance a fresh medium serves before the first grant. */
+  startingBalance: number
+  /** Largest amount one grant may carry. */
+  maxGrant: number
+}
+```
+
+来源：[`packages/workbench/workbench/src/index.ts:58`](../packages/workbench/workbench/src/index.ts)
+
 <a id="deepseek-aidsh-workflow-worker-thread"></a>
 
 ## `@deepseek-ai/dsh-workflow-worker-thread`
@@ -3474,6 +3499,7 @@ export interface Config {
 - `@deepseek-ai/dsh-client-ui-tool`（[`packages/client/ui-tool/src/index.ts`](../packages/client/ui-tool/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-trajectory`（[`packages/client/ui-trajectory/src/index.ts`](../packages/client/ui-trajectory/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-user-questions`（[`packages/client/ui-user-questions/src/index.ts`](../packages/client/ui-user-questions/src/index.ts)）
+- `@deepseek-ai/dsh-client-ui-workbench`（[`packages/client/ui-workbench/src/index.ts`](../packages/client/ui-workbench/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-workflow-run`（[`packages/client/ui-workflow-run/src/index.ts`](../packages/client/ui-workflow-run/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-workspace`（[`packages/client/ui-workspace/src/index.ts`](../packages/client/ui-workspace/src/index.ts)）
 - `@deepseek-ai/dsh-command-compact` — 需要 `commands` · `compact`（[`packages/compaction/command-compact/src/index.ts`](../packages/compaction/command-compact/src/index.ts)）

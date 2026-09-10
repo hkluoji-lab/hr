@@ -15,9 +15,18 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { ProducedFiles } from './ProducedFiles.tsx'
 import { en, NS, zh, type DeliverablesKey } from './locales.ts'
+import type { ProducedFileEntry, SessionDeliverables } from './session-deliverables.ts'
 import {
-  deliverablesDefinition, producedFileMentions, selectProducedFiles,
+  basename, deliverablesDefinition, producedFileMentions, producedPathsFromEvents,
+  selectProducedFiles,
 } from './turn-deliverables.ts'
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /** Optional session-wide produced-file fold; absent when this plugin is composed out. */
+    sessionDeliverables: SessionDeliverables
+  }
+}
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -27,7 +36,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 export { ProducedFiles, type ProducedFilesProps } from './ProducedFiles.tsx'
-export { producedForClosing } from './turn-deliverables.ts'
+export { basename, producedForClosing, producedPathsFromEvents } from './turn-deliverables.ts'
+export type { ProducedFileEntry, SessionDeliverables } from './session-deliverables.ts'
 
 /** Required services for the tail-slot registration and its dictionaries. */
 export const inject = ['slots', 'locale', 'uiConversation', 'remote', 'remote.session']
@@ -60,4 +70,14 @@ export function apply(ctx: ClientContext): void {
     },
   }
   ctx.provide('chatFileMentions', mentions)
+
+  // Session-wide surface for the same vocabulary: right-Sidebar tabs fold a
+  // whole Session window through this service instead of importing the
+  // mutation policy.
+  const sessionDeliverables: SessionDeliverables = {
+    produced(events): readonly ProducedFileEntry[] {
+      return producedPathsFromEvents(events).map(path => ({ path, name: basename(path) }))
+    },
+  }
+  ctx.provide('sessionDeliverables', sessionDeliverables)
 }

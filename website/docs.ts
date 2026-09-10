@@ -350,6 +350,7 @@ const subsystemGroups = [
     ['client-resources.md', '客户端资源', 'Client resources'],
     ['sidebar-right.md', '右侧 Sidebar', 'Right Sidebar'],
     ['conversation.md', 'Conversation 组装', 'Conversation assembly'],
+    ['workbench.md', '工作台', 'Workbench'],
     ['typert.md', 'Typert', 'Typert'],
     ['storage.md', '存储', 'Storage'],
     ['workspace.md', '工作区', 'Workspaces'],

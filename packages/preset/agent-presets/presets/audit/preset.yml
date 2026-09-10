@@ -1,0 +1,3 @@
+name: AI 审计
+description: 负责凭证抽查、数据核对与风险提示的审计型 Agent。
+order: 8

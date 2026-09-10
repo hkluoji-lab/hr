@@ -2836,6 +2836,32 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'workbench',
+    summary: 'The workbench Remote service: credits storage plus roster aggregation.',
+    description: 'The workbench Remote service: credits storage plus roster aggregation.',
+    methods: [
+      {
+        signature: '@Remote(\'snapshot\') async remoteSnapshot(): Promise<WorkbenchSnapshot>',
+        description: 'The Remote read: current credits balance beside the aggregated team.',
+        parameters: [],
+        returns: 'one snapshot over both halves.',
+      },
+      {
+        signature: '@Remote(\'addCredits\') async addCredits(amount: number, reason: string): Promise<WorkbenchCreditGrant>',
+        description: 'Grant points: append one ledger entry, then replace the balance global. Both writes queue on the domain\'s single chain, so concurrent grants never interleave or lose an increment.',
+        parameters: [{ name: 'amount', description: 'positive integer points, at most `config.maxGrant`.' }, { name: 'reason', description: 'non-empty trimmed reason, at most {@link MAX_REASON_LENGTH} characters.' }],
+        returns: 'the new balance beside the appended entry.',
+        throws: ['RemoteError `gateway/bad-request` when the amount or reason is invalid.'],
+      },
+      {
+        signature: '@Remote(\'ledger\') remoteLedger(): Promise<WorkbenchLedger>',
+        description: 'The Remote ledger read: the most recent grants, newest first. The page is bounded because the ledger is append-only — a long-lived deployment accumulates one row per grant.',
+        parameters: [],
+        returns: 'the recent entries, at most {@link LEDGER_READ_LIMIT}.',
+      },
+    ],
+  },
+  {
     key: 'workflowEngine',
     summary: 'Workflow Service Definition contract.',
     description: 'Workflow Service Definition contract. Invalid requests throw before publication; a live run is holder-owned, its result never rejects, cancellation and disposal are bounded, and disposal waits for child cleanup within that bound. Lifecycle listener failures are contained, and `workflow/end` fires exactly once as the result settles.',
@@ -6306,6 +6332,38 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WebUpgradeRoute',
     declaration: 'export interface WebUpgradeRoute {\n    path: string;\n    handler: (req: IncomingMessage, socket: Duplex, head: Buffer) => void | Promise<void>;\n}',
+  },
+  {
+    name: 'WorkbenchCreditEntry',
+    declaration: 'export interface WorkbenchCreditEntry {\n    readonly id: string;\n    readonly amount: number;\n    readonly reason: string;\n    readonly at: number;\n}',
+  },
+  {
+    name: 'WorkbenchCreditGrant',
+    declaration: 'export interface WorkbenchCreditGrant {\n    readonly balance: number;\n    readonly entry: WorkbenchCreditEntry;\n}',
+  },
+  {
+    name: 'WorkbenchCredits',
+    declaration: 'export interface WorkbenchCredits {\n    readonly balance: number;\n}',
+  },
+  {
+    name: 'WorkbenchLedger',
+    declaration: 'export interface WorkbenchLedger {\n    readonly entries: readonly WorkbenchCreditEntry[];\n}',
+  },
+  {
+    name: 'WorkbenchMember',
+    declaration: 'export interface WorkbenchMember {\n    readonly id: string;\n    readonly name?: string;\n    readonly description?: string;\n    readonly status: WorkbenchMemberStatus;\n}',
+  },
+  {
+    name: 'WorkbenchMemberStatus',
+    declaration: 'export type WorkbenchMemberStatus = \'online\' | \'busy\' | \'offline\';',
+  },
+  {
+    name: 'WorkbenchSnapshot',
+    declaration: 'export interface WorkbenchSnapshot {\n    readonly credits: WorkbenchCredits;\n    readonly team: WorkbenchTeam;\n}',
+  },
+  {
+    name: 'WorkbenchTeam',
+    declaration: 'export interface WorkbenchTeam {\n    readonly online: number;\n    readonly busy: number;\n    readonly offline: number;\n    readonly members: readonly WorkbenchMember[];\n}',
   },
   {
     name: 'WorkflowAgentEndInfo',

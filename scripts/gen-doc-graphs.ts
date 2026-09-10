@@ -655,6 +655,13 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Provider adapters dispatch authenticated deliveries; trusted plugins register independent process-local rules, and the runtime turns non-null results into ordinary Workspace-backed Sessions without delivery or completion state.',
   },
   {
+    key: 'workbench',
+    pkg: 'workbench',
+    title: 'Host workbench credits and team status',
+    mode: 'core',
+    note: 'Owns the credits storage domain and the roster-vs-session team fold, serving both through the workbench Typert Remote namespace for browser surfaces.',
+  },
+  {
     key: 'lsp',
     pkg: 'lsp',
     title: 'Language-server navigation seam',
