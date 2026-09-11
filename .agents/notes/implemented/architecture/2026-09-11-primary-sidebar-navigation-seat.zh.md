@@ -14,7 +14,7 @@ Status: implemented
 
 `ui-workbench` 按设计顺序注册五个入口，每个表面一个，id 为 `workbench-<target>`，`order` 等于其下标。每个入口通过 `navActionFace(controller, target)` 自行拥有目标与激活外观：页面目标切换 `controller.togglePage`，并在打开页面 store 指向该页面时报告为当前；项目目标调用 `controller.viewProjects()` 且永不报告为当前，因为它展开侧栏而非打开页面。入口组件在 `wide` 下渲染为带文字的行，在轨道上渲染为纯图标控件；侧边栏外壳的轨道入场动画包含该座位。
 
-AI 团队条目在其自身内部渲染设计中的角色组：来自共享 `ROLES` 表的四个可展开角色（AI 秘书、AI 会计、AI 法务、AI 审计），秘书角色默认展开，每个角色列出其能力子项（AI-客服、AI-合同……），子项经 face 的 `openTeam` 打开团队页。这些子项是组件输出而非槽位条目——该座位保持为扁平的五条目列表，部署替换该入口时其角色组随之一起被替换。
+AI 团队条目在其自身内部渲染设计中的角色组：来自共享 `ROLES` 表的四个可展开角色（AI 秘书、AI 会计、AI 法务、AI 审计），全部默认展开，每个角色列出其能力子项（AI-客服、AI-合同……），子项经 face 的 `openTeam` 打开团队页。这些子项是组件输出而非槽位条目——该座位保持为扁平的五条目列表，部署替换该入口时其角色组随之一起被替换。
 
 ## Alternatives considered
 

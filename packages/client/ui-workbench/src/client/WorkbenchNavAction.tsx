@@ -75,10 +75,12 @@ export function WorkbenchNavAction({ wide, t, target, useActive, activate, openT
   const label = t(TARGETS[target].label)
   const Icon = TARGETS[target].icon
 
-  // Expansion is this row's presentation state, not page state; the design
-  // shows the group and the secretary role already open.
+  // Expansion is this row's presentation state, not page state; the group and
+  // every role ship open so the full company team is visible at a glance.
   const [groupOpen, setGroupOpen] = useState(true)
-  const [rolesOpen, setRolesOpen] = useState<ReadonlySet<RoleMeta['id']>>(() => new Set(['secretary']))
+  const [rolesOpen, setRolesOpen] = useState<ReadonlySet<RoleMeta['id']>>(
+    () => new Set(ROLES.map(role => role.id)),
+  )
 
   const button = (
     <button

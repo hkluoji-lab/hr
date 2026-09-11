@@ -14,7 +14,7 @@ The left sidebar shell had one seat a feature could fill near its top: `sidebar.
 
 `ui-workbench` registers the five entries, one per surface, in the design's order with ids `workbench-<target>` and `order` equal to their index. Each entry owns its target and its active appearance through `navActionFace(controller, target)`: a page target toggles `controller.togglePage` and reports current while the open-page store names that page, and the Projects target calls `controller.viewProjects()` and is never current, because it reveals the sidebar rather than opening a page. The entry component renders a labelled row when `wide` and an icon-only control on the rail; the sidebar shell's rail-entry animation includes the seat.
 
-The AI-team entry renders the design's role groups inside itself: four expandable roles from the shared `ROLES` table (AI secretary, AI accountant, AI legal, AI audit), the secretary one open by default, each listing its capability entries (AI-Service, AI-Contracts, …) that open the team page through the face's `openTeam`. The children are component output, not slot entries — the seat stays a flat five-entry list, and a deployment replacing the entry replaces its role groups with it.
+The AI-team entry renders the design's role groups inside itself: four expandable roles from the shared `ROLES` table (AI secretary, AI accountant, AI legal, AI audit), all open by default, each listing its capability entries (AI-Service, AI-Contracts, …) that open the team page through the face's `openTeam`. The children are component output, not slot entries — the seat stays a flat five-entry list, and a deployment replacing the entry replaces its role groups with it.
 
 ## Alternatives considered
 
