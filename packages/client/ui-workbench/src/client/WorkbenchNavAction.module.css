@@ -52,3 +52,128 @@
   overflow: hidden;
   white-space: nowrap;
 }
+
+/* The AI-team entry's expandable group: the row plus its role children. */
+.group {
+  width: 100%;
+}
+
+.rowWrap {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.rowWrap .action {
+  /* The row shares its line with the group chevron. */
+  flex: 1;
+  min-width: 0;
+}
+
+.chevron {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+  color: var(--dsw-alias-label-secondary, #8a8a8a);
+}
+
+.chevron:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.06));
+}
+
+.children {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding-left: 14px;
+  box-sizing: border-box;
+}
+
+.roleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  margin: 0;
+  padding: 0 10px 0 12px;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary, #1a1a1a);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  text-align: left;
+}
+
+.roleRow:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.06));
+}
+
+.roleGlyph {
+  flex: none;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.roleChevron {
+  flex: none;
+  display: flex;
+  margin-left: auto;
+  color: var(--dsw-alias-label-tertiary, #b0b0b0);
+}
+
+.roleChildren {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding-left: 18px;
+  box-sizing: border-box;
+}
+
+.childRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  padding: 0 10px 0 14px;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary, #6a6a6a);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  text-align: left;
+}
+
+.childRow:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.06));
+  color: var(--dsw-alias-label-primary, #1a1a1a);
+}
+
+.childDot {
+  flex: none;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--dsw-alias-label-tertiary, #b0b0b0);
+}

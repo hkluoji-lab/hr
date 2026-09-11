@@ -27,7 +27,7 @@ kind: "package-reference"
 
 与运行时一起挂载本插件；没有当前会话时，hero 会在标题区与工作区行之间显示仪表盘。「新建任务」以部署默认组合开启新会话，「查看项目」展开侧栏的工作区浏览器，每张团队成员卡则以该成员的预设组合开启会话。损坏的预设渲染为离线且不可点击。宿主 workbench 服务存在时，副标题显示积分余额。
 
-侧栏主导航在新会话按钮正下方新增五个入口，不替换任何侧栏区域；宽栏下渲染为带文字的行，rail 折叠态下渲染为 36px 带 Tooltip 的控件。**任务大厅**列出全部已启动会话——标题、运行它的预设、生命周期与最近更新时间——点击行即选中该会话。**智能任务助手**是任务描述表单：写下任务、可选地指派一名成员（或留给默认团队），提交后开启该会话并把描述作为它的首条用户消息。**活跃任务**是只保留运行中会话的大厅。**AI 团队**以页面尺度渲染预设名册，点击卡片以该成员的预设开启会话。**项目**展开工作区浏览器。前四项打开覆盖应用整帧的页面，再次点击当前项（或页面的关闭控件，或 Escape）即关闭。**本月报告**从 hero 的快捷动作打开，并列展示本自然月的任务统计、积分余额、发放表单与最近明细。
+侧栏主导航在新会话按钮正下方新增五个入口，不替换任何侧栏区域；宽栏下渲染为带文字的行，rail 折叠态下渲染为 36px 带 Tooltip 的控件。**任务大厅**列出全部已启动会话——标题、运行它的预设、生命周期与最近更新时间——点击行即选中该会话。**智能任务助手**是任务描述表单：写下任务、可选地指派一名成员（或留给默认团队），提交后开启该会话并把描述作为它的首条用户消息。**活跃任务**是只保留运行中会话的大厅。**AI 团队**以页面尺度渲染预设名册，点击卡片以该成员的预设开启会话；其导航条目还会在原位展开四个角色组——AI 秘书、AI 会计、AI 法务、AI 审计——每个角色组列出该角色的能力子项（AI-客服、AI-合同……），点击子项即打开团队页。**项目**展开工作区浏览器。前四项打开覆盖应用整帧的页面，再次点击当前项（或页面的关闭控件，或 Escape）即关闭。**本月报告**从 hero 的快捷动作打开，并列展示本自然月的任务统计、积分余额、发放表单与最近明细。
 
 hero 上的「调用 AI 团队」与「本月报告」会打开同样的团队页与报告页。
 
@@ -47,7 +47,7 @@ hero 上的「调用 AI 团队」与「本月报告」会打开同样的团队�
 
 单个 `WorkbenchController` 支撑全部表面，因此导航入口与 hero 快捷方式驱动同一份页面状态。它持有三个快照 store：团队/积分仪表盘、当前打开页面的 id、积分明细。`load()` 发一次 `agentPresets.list`（与其他预设表面一样把 `gateway/invocation-unavailable` 视为空名册），折叠会话列表把有非空白会话的预设标记为「工作中」，损坏预设排到末尾作为「离线」。`startWithPreset(id)` 复刻 hero 预设芯片：先 stage id，调用 `uiWorkspace.startSession()`，下一次会话列表变化时对新的空白会话应用 `agentPresets.select`——宿主拒绝为非空白会话换组合。`assignTask(presetId, brief)` 走同一次开启流程，并在绑定出现后把描述作为该会话的首条用户消息提交。
 
-hero 向 `conversation.hero.dashboard` 列表槽位（由 ui-conversation 声明，scope 为 `root`）贡献一个条目。五个条目占用 `sidebar.nav` 列表槽位（由 ui-sidebar 声明，scope 为 `root`），因此无需改动侧栏外壳代码：`navActionFace(controller, target)` 把页面目标绑为 `controller.togglePage` 并从打开页面 store 派生活动态，把项目绑为 `controller.viewProjects()`，即展开侧栏工作区浏览器。页面表面是 `shell.overlay` 列表槽位（由 ui-layout 声明，scope 为 `root`）中的一个条目；`WorkbenchShell` 在没有页面打开时渲染 null，保持 overlay 层可点击穿透，并分发到大厅、助手、活跃任务、团队或报告页。大厅折叠会话列表（跳过空白与子任务会话），其 hook 按列表快照缓存，使 `useSyncExternalStore` 始终看到稳定引用。
+hero 向 `conversation.hero.dashboard` 列表槽位（由 ui-conversation 声明，scope 为 `root`）贡献一个条目。五个条目占用 `sidebar.nav` 列表槽位（由 ui-sidebar 声明，scope 为 `root`），因此无需改动侧栏外壳代码：`navActionFace(controller, target)` 把页面目标绑为 `controller.togglePage` 并从打开页面 store 派生活动态，把项目绑为 `controller.viewProjects()`，即展开侧栏工作区浏览器，并把 `openTeam` 绑为 `controller.openPage('team')` 供团队条目的能力子项使用。团队条目内联渲染 `ROLES` 角色组；展开状态是该行的组件本地状态（分组与秘书角色默认展开，与设计一致），子项永远不会变成槽位条目。页面表面是 `shell.overlay` 列表槽位（由 ui-layout 声明，scope 为 `root`）中的一个条目；`WorkbenchShell` 在没有页面打开时渲染 null，保持 overlay 层可点击穿透，并分发到大厅、助手、活跃任务、团队或报告页。大厅折叠会话列表（跳过空白与子任务会话），其 hook 按列表快照缓存，使 `useSyncExternalStore` 始终看到稳定引用。
 
 报告页通过宿主 workbench 的 `ledger` Remote 读取有界明细，通过 `addCredits` 发放，并以宿主自身的返回刷新余额与明细。`monthReport` 用同一批大厅行与明细条目统计本地自然月。
 

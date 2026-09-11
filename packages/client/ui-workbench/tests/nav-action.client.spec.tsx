@@ -5,7 +5,9 @@
  * row renders the labelled control and the rail renders the icon-only button
  * (Tooltip wraps it). Each page face derives its active state from the page
  * store and toggles that page; the `projects` command reveals the sidebar
- * instead and is never current.
+ * instead and is never current. The team entry additionally renders the four
+ * role groups inline, each expandable to capability children that open the
+ * team page through the face's `openTeam`.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
@@ -19,7 +21,9 @@ import { zh } from '../src/client/locales.ts'
 const t: WorkbenchNavActionProps['t'] = makeTranslate(zh)
 
 function props(over: Partial<WorkbenchNavActionProps>): WorkbenchNavActionProps {
-  return { wide: true, t, target: 'hall', useActive: () => false, activate: vi.fn(), ...over } as unknown as WorkbenchNavActionProps
+  return {
+    wide: true, t, target: 'hall', useActive: () => false, activate: vi.fn(), openTeam: vi.fn(), ...over,
+  } as unknown as WorkbenchNavActionProps
 }
 
 afterEach(() => {
@@ -51,6 +55,52 @@ describe('WorkbenchNavAction', () => {
     expect(button.textContent).toBe('')
     fireEvent.click(button)
     expect(activate).toHaveBeenCalledTimes(1)
+  })
+
+  it('the team entry renders the four role groups with the secretary children open', () => {
+    render(<WorkbenchNavAction {...props({ target: 'team' })} />)
+    for (const key of ['nav.role.secretary', 'nav.role.accountant', 'nav.role.legal', 'nav.role.audit'] as const) {
+      expect(screen.getByRole('button', { name: zh[key] }).getAttribute('aria-expanded')).toBe(
+        key === 'nav.role.secretary' ? 'true' : 'false',
+      )
+    }
+    for (const key of ['role.secretary.tag.service', 'role.secretary.tag.contract', 'role.secretary.tag.chase', 'role.secretary.tag.archive'] as const) {
+      expect(screen.getByRole('button', { name: `AI-${zh[key]}` })).toBeTruthy()
+    }
+    // The other roles sit collapsed, so their capabilities stay unmounted.
+    expect(screen.queryByRole('button', { name: `AI-${zh['role.accountant.tag.books']}` })).toBeNull()
+  })
+
+  it('a role row toggles its capability children', () => {
+    render(<WorkbenchNavAction {...props({ target: 'team' })} />)
+    const accountant = screen.getByRole('button', { name: zh['nav.role.accountant'] })
+    expect(screen.queryByRole('button', { name: `AI-${zh['role.accountant.tag.books']}` })).toBeNull()
+
+    fireEvent.click(accountant)
+    expect(screen.getByRole('button', { name: `AI-${zh['role.accountant.tag.books']}` })).toBeTruthy()
+
+    fireEvent.click(accountant)
+    expect(screen.queryByRole('button', { name: `AI-${zh['role.accountant.tag.books']}` })).toBeNull()
+  })
+
+  it('a capability child opens the team page through openTeam', () => {
+    const openTeam = vi.fn()
+    render(<WorkbenchNavAction {...props({ target: 'team', openTeam })} />)
+    fireEvent.click(screen.getByRole('button', { name: `AI-${zh['role.secretary.tag.service']}` }))
+    expect(openTeam).toHaveBeenCalledTimes(1)
+  })
+
+  it('the team chevron collapses and reopens the role groups', () => {
+    render(<WorkbenchNavAction {...props({ target: 'team' })} />)
+    const toggle = screen.getByRole('button', { name: zh['nav.team.toggle'] })
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByRole('button', { name: zh['nav.role.secretary'] })).toBeNull()
+
+    fireEvent.click(toggle)
+    expect(screen.getByRole('button', { name: zh['nav.role.secretary'] })).toBeTruthy()
   })
 })
 
@@ -98,5 +148,16 @@ describe('navActionFace', () => {
     expect(b.toggleSidebar).toHaveBeenCalledTimes(1)
     expect(b.controller.pages.getSnapshot().open).toBeNull()
     expect(active()).toBe(false)
+  })
+
+  it('openTeam shows the team page without toggling it off', () => {
+    const b = bench()
+    const entry = b.face('hall')
+
+    act(() => { entry.openTeam() })
+    expect(b.controller.pages.getSnapshot().open).toBe('team')
+
+    act(() => { entry.openTeam() })
+    expect(b.controller.pages.getSnapshot().open).toBe('team')
   })
 })
