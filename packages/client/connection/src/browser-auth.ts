@@ -218,7 +218,7 @@ export class BrowserAuth {
    * @param processOwner - root application context retaining one token across Connection reloads.
    * @param credentials - persistent credential provider for the Web profile.
    * @param maxAgeDays - positive absolute browser-cookie lifetime in days.
-   * @param trustLoopback - serve the index to any loopback request without the launch token or cookie.
+   * @param trustLoopback - serve tokenless loopback index requests without a cookie; a `?token=` request still exchanges first.
    * @returns initialized authentication owner with the process owner's launch token.
    */
   static async create(
@@ -247,7 +247,10 @@ export class BrowserAuth {
   /**
    * Authenticate an index request. A valid root query token mints the cookie
    * and redirects to clean `/`; a valid cookie lets the caller serve the
-   * index; every other request receives the same minimal 401 response.
+   * index; every other request receives the same minimal 401 response. The
+   * token exchange keeps precedence over loopback trust: `trustLoopback`
+   * opens tokenless loopback requests, while the printed `?token=` URL still
+   * mints the cookie that every `/api` request requires.
    * @param req - incoming root or configured-index request.
    * @param res - response owned when this method returns false.
    * @returns true only when the caller may serve index.html.
@@ -255,7 +258,6 @@ export class BrowserAuth {
   authorizeIndex(req: ConnectionIndexRequest, res: ConnectionIndexResponse): boolean {
     /* v8 ignore next -- node:http always supplies url on server requests. */
     const url = new URL(req.url ?? '/', 'http://dsh.invalid')
-    if (this.trustLoopback && isLoopbackAuthority(requestAuthority(req.headers))) return true
     const tokens = url.searchParams.getAll(TOKEN_QUERY)
     if (tokens.length > 0) {
       const authority = requestAuthority(req.headers)
@@ -292,6 +294,7 @@ export class BrowserAuth {
       this.writeUnauthorized(req, res)
       return false
     }
+    if (this.trustLoopback && isLoopbackAuthority(requestAuthority(req.headers))) return true
     if (this.isAuthenticated(req)) return true
     this.writeUnauthorized(req, res)
     return false

@@ -186,6 +186,15 @@ describe('BrowserAuth', () => {
     expect(denied.state.status).toBe(401)
   })
 
+  it('trustLoopback keeps the token exchange first so the printed URL still mints', async () => {
+    const open = await createAuth(new RecordCredentials(), 30, {}, true)
+    const minted = exchange(open)
+    expect(minted.state.status).toBe(303)
+    const stale = response()
+    expect(open.authorizeIndex(request('/?token=wrong'), stale.value)).toBe(false)
+    expect(stale.state.status).toBe(401)
+  })
+
   it('rejects tampering, expiry, future issuance, and a longer lifetime than configured', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-08-24T00:00:00.000Z'))
