@@ -13,10 +13,13 @@
   display: block;
 }
 
-/* Wordmark row: brand name with the red 秘 badge at its top-right corner. */
+/* Wordmark row: brand name with the red 秘 badge raised beside it. The shell's
+   brand row clips overflow, so the badge stays inside the row's box and only
+   translates up visually. */
 .name {
   display: inline-flex;
   align-items: center;
+  gap: 2px;
   position: relative;
   min-width: 0;
 }
@@ -31,9 +34,7 @@
 }
 
 .badge {
-  position: absolute;
-  top: -3px;
-  right: -15px;
+  flex: none;
   width: 14px;
   height: 14px;
   display: inline-flex;
@@ -45,4 +46,5 @@
   font-size: 9px;
   font-weight: 600;
   line-height: 1;
+  transform: translateY(-3px);
 }

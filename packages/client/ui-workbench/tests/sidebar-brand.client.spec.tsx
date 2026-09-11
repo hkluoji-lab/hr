@@ -3,7 +3,7 @@
  * SidebarBrand: the deployment-brand occupants of the sidebar shell's two
  * `single` brand slots. The tile renders at the shell-requested size with the
  * drawn stacked-layers mark and an accessible name; the wordmark renders
- * 星耀智 and the red 秘 badge (decorative, so hidden from the accessibility
+ * 星躍智 and the red 秘 badge (decorative, so hidden from the accessibility
  * tree).
  */
 import { afterEach, describe, expect, it } from 'vitest'

@@ -109,7 +109,7 @@ export function apply(ctx: ClientContext): void {
   })
 
   // Deployment branding: replace the sidebar shell's fish/generic-text brand
-  // fallbacks with the design's 星耀智 tile and wordmark (text placeholders
+  // fallbacks with the design's 星躍智 tile and wordmark (text placeholders
   // until image assets land). The `single` slots exist in both the expanded
   // brand row and the collapsed rail, so one registration covers both.
   ctx.inject(['slots'], (scope: ClientContext) => {

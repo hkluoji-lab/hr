@@ -2,7 +2,7 @@
  * Deployment branding occupants for the sidebar shell's two `single` brand
  * slots. The logo tile draws the design's pink-gradient rounded square with
  * the white stacked-layers mark, in both the expanded brand row and the
- * collapsed rail; the wordmark occupant renders 星耀智 plus the red 秘 badge.
+ * collapsed rail; the wordmark occupant renders 星躍智 plus the red 秘 badge.
  */
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: pulls ui-sidebar's SlotMap merge (the two brand seats).
@@ -59,7 +59,7 @@ export type SidebarBrandNameProps =
   & PropsLocale<typeof NS>
 
 /**
- * Render the 星耀智 wordmark with the red 秘 badge.
+ * Render the 星躍智 wordmark with the red 秘 badge.
  * @param props - the translate seat.
  * @returns the wordmark row.
  */
