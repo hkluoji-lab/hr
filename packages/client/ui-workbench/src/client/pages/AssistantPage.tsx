@@ -4,12 +4,15 @@
  *
  * The session starts blank — the Workspace navigation service creates or
  * reuses it — and the controller submits the brief as that session's first
- * user message, so the form owns only the two choices it collects.
+ * user message, so the form owns only the two choices it collects. The picker
+ * presents the company's role roster (the same `roleMembers` fold the hero and
+ * the team page show), so mode and other non-role presets are never assignable
+ * here.
  */
 import { useState } from 'react'
 import { Button, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
-import { memberDotState, type WorkbenchState } from '../workbench-store.ts'
+import { memberDotState, roleMembers, type WorkbenchState } from '../workbench-store.ts'
 import css from './WorkbenchPages.module.css'
 
 /** Longest brief the page submits; the textarea clamps to it. */
@@ -34,6 +37,7 @@ export function AssistantPage({ state, onAssign, t }: AssistantPageProps) {
   const [brief, setBrief] = useState('')
   const [selected, setSelected] = useState<string | undefined>(undefined)
   const trimmed = brief.trim()
+  const roster = roleMembers(state.members)
 
   return (
     <form
@@ -66,7 +70,7 @@ export function AssistantPage({ state, onAssign, t }: AssistantPageProps) {
           >
             {t('hall.defaultTeam')}
           </button>
-          {state.members.map(member => (
+          {roster.map(member => (
             <button
               key={member.id}
               type="button"
@@ -81,7 +85,7 @@ export function AssistantPage({ state, onAssign, t }: AssistantPageProps) {
             </button>
           ))}
         </div>
-        {state.members.length === 0 && <p className={css.memberEmpty}>{t('assistant.empty')}</p>}
+        {roster.length === 0 && <p className={css.memberEmpty}>{t('assistant.empty')}</p>}
       </div>
       <div className={css.submitRow}>
         <Button type="submit" variant="primary" disabled={trimmed.length === 0}>

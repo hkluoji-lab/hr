@@ -31,7 +31,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { WorkbenchCreditEntry } from '@deepseek-ai/dsh-workbench/types'
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
-import { roleOf, type RoleMeta } from './roles.ts'
+import { ROLES, roleOf, type RoleMeta } from './roles.ts'
 
 /** A team member's live state, mirroring the roster vs live sessions. */
 export type TeamMemberState = 'online' | 'busy' | 'offline'
@@ -64,6 +64,21 @@ export interface TeamMember {
   role: RoleMeta | undefined
 }
 
+/**
+ * Order the roster for role display: the four company roles in their design
+ * order when the deployment composes them, otherwise every preset. The hero
+ * dashboard and the team page present the same fold, so mode and other
+ * non-role presets never appear as the company's team.
+ * @param members - the full roster from the snapshot.
+ * @returns the member cards the role surfaces present.
+ */
+export function roleMembers(members: readonly TeamMember[]): readonly TeamMember[] {
+  const roles = ROLES
+    .map(role => members.find(member => member.role?.id === role.id))
+    .filter((member): member is TeamMember => member !== undefined)
+  return roles.length > 0 ? roles : members
+}
+
 /** Workbench dashboard snapshot. */
 export interface WorkbenchState {
   /** Read lifecycle: `unavailable` means the deployment composes no presets. */
@@ -72,11 +87,11 @@ export interface WorkbenchState {
   error: string | null
   /** Team members in roster order, broken presets last. */
   members: readonly TeamMember[]
-  /** Count of members online (healthy, idle). */
+  /** Count of the company's role members online (healthy, idle). */
   online: number
-  /** Count of members busy (a live session runs their preset). */
+  /** Count of the company's role members busy (a live session runs their preset). */
   busy: number
-  /** Count of members offline (broken presets). */
+  /** Count of the company's role members offline (broken presets). */
   offline: number
   /** Persisted credits balance, or null when the host composes no workbench service. */
   credits: number | null
@@ -346,14 +361,17 @@ export class WorkbenchController {
       left.state === 'offline' && right.state !== 'offline' ? 1
         : right.state === 'offline' && left.state !== 'offline' ? -1
           : 0)
+    // Every "AI team status" count reads the company's role roster, so mode
+    // and other non-role presets never dilute the team's tallies.
+    const roleRoster = roleMembers(members)
     this.set({
       status: 'ready',
       error: null,
       members,
       credits,
-      online: members.filter(member => member.state === 'online').length,
-      busy: members.filter(member => member.state === 'busy').length,
-      offline: members.filter(member => member.state === 'offline').length,
+      online: roleRoster.filter(member => member.state === 'online').length,
+      busy: roleRoster.filter(member => member.state === 'busy').length,
+      offline: roleRoster.filter(member => member.state === 'offline').length,
       todayCount: counts.today,
       runningCount: counts.running,
       doneCount: counts.done,

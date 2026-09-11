@@ -18,6 +18,7 @@ import { ReportPage, type ReportPageProps } from '../src/client/pages/ReportPage
 import type {
   LedgerState, TaskRow, TeamMember, WorkbenchPagesState, WorkbenchState,
 } from '../src/client/workbench-store.ts'
+import { ROLES } from '../src/client/roles.ts'
 import { zh } from '../src/client/locales.ts'
 
 const t = makeTranslate(zh) as TaskHallPageProps['t']
@@ -99,6 +100,25 @@ describe('TeamPage', () => {
     fireEvent.click(screen.getByText('极简模式').closest('button')!)
     expect(onStart).toHaveBeenCalledWith('minimal')
   })
+
+  it('hides non-role presets once the deployment composes the company roles', () => {
+    const roster: readonly TeamMember[] = [
+      { id: 'standard', name: '标准模式', description: '完整工具集', state: 'online', role: undefined },
+      { id: 'crew', name: '经营团队', description: '', state: 'online', role: undefined },
+      { id: 'secretary', name: 'AI 秘书', description: '', state: 'online', role: ROLES[0] },
+      { id: 'audit', name: 'AI 审计', description: '', state: 'busy', role: ROLES[3] },
+    ]
+    const onStart = vi.fn()
+    render(<TeamPage state={{ ...READY, members: roster }} onStart={onStart} t={t} />)
+    expect(screen.getByText('AI 秘书')).toBeTruthy()
+    expect(screen.getByText('AI 审计')).toBeTruthy()
+    expect(screen.queryByText('标准模式')).toBeNull()
+    expect(screen.queryByText('经营团队')).toBeNull()
+    expect(screen.queryByText('PTC模式')).toBeNull()
+
+    fireEvent.click(screen.getByText('AI 秘书').closest('button')!)
+    expect(onStart).toHaveBeenCalledWith('secretary')
+  })
 })
 
 describe('AssistantPage', () => {
@@ -161,6 +181,21 @@ describe('AssistantPage', () => {
   it('notes a deployment that ships no presets', () => {
     render(<AssistantPage state={{ ...READY, members: [] }} onAssign={vi.fn()} t={assistantT} />)
     expect(screen.getByText(zh['assistant.empty'])).toBeTruthy()
+  })
+
+  it('hides non-role presets from the picker once the deployment composes the company roles', () => {
+    const roster: readonly TeamMember[] = [
+      { id: 'standard', name: '标准模式', description: '', state: 'online', role: undefined },
+      { id: 'secretary', name: 'AI 秘书', description: '', state: 'online', role: ROLES[0] },
+      { id: 'legal', name: 'AI 法务', description: '', state: 'busy', role: ROLES[2] },
+    ]
+    render(<AssistantPage state={{ ...READY, members: roster }} onAssign={vi.fn()} t={assistantT} />)
+
+    expect(screen.getByRole('button', { name: 'AI 秘书' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'AI 法务' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '标准模式' })).toBeNull()
+    // The default-team chip stays first regardless of the roster.
+    expect(screen.getByRole('button', { name: zh['hall.defaultTeam'] })).toBeTruthy()
   })
 })
 

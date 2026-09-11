@@ -21,8 +21,7 @@ import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { MemberCard } from './MemberCard.tsx'
 import { HeroSideCards } from './HeroSideCards.tsx'
-import { ROLES } from './roles.ts'
-import type { TeamMember, WorkbenchPageId, WorkbenchState } from './workbench-store.ts'
+import { roleMembers, type WorkbenchPageId, type WorkbenchState } from './workbench-store.ts'
 import { NS, type WorkbenchKey } from './locales.ts'
 import css from './WorkbenchDashboard.module.css'
 
@@ -73,19 +72,6 @@ const QUICK_ACTIONS: readonly QuickAction[] = [
 ]
 
 /**
- * Order the roster for hero display: the four company roles in their design
- * order when the deployment composes them, otherwise every preset.
- * @param members - the full roster from the snapshot.
- * @returns the cards the hero presents.
- */
-function heroMembers(members: readonly TeamMember[]): readonly TeamMember[] {
-  const roles = ROLES
-    .map(role => members.find(member => member.role?.id === role.id))
-    .filter((member): member is TeamMember => member !== undefined)
-  return roles.length > 0 ? roles : members
-}
-
-/**
  * Render the hero workbench dashboard.
  * @param props - composed slot props.
  * @returns the dashboard element tree.
@@ -115,7 +101,7 @@ export function WorkbenchDashboard({
     return () => { previous.forEach(({ el, display }) => { el.style.display = display }) }
   }, [])
 
-  const roster = heroMembers(state.members)
+  const roster = roleMembers(state.members)
   const activeStaff = state.online + state.busy
   const stats: ReadonlyArray<{ key: WorkbenchKey; value: string }> = [
     { key: 'stat.today', value: String(state.todayCount) },

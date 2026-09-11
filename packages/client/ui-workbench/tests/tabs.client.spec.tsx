@@ -29,6 +29,7 @@ import { creditsFace, deliverablesFace, progressFace, teamStatusFace } from '../
 import {
   WorkbenchController, type LedgerState, type TeamMember, type WorkbenchState,
 } from '../src/client/workbench-store.ts'
+import { roleOf } from '../src/client/roles.ts'
 import { zh } from '../src/client/locales.ts'
 
 afterEach(() => {
@@ -252,6 +253,27 @@ describe('TeamStatusTab', () => {
     expect(view.getByText('标准模式')).toBeTruthy()
     expect(view.getByText('极简模式')).toBeTruthy()
     expect(view.getByText('失效预设')).toBeTruthy()
+  })
+
+  it('scopes the list and tallies to the company roles once the deployment composes them', () => {
+    const state: WorkbenchState = {
+      ...READY,
+      members: [
+        { id: 'standard', name: '标准模式', description: '', state: 'online', role: undefined },
+        { id: 'crew', name: '经营团队', description: '', state: 'busy', role: undefined },
+        { id: 'secretary', name: 'AI 秘书', description: '', state: 'online', role: roleOf('AI 秘书') },
+        { id: 'audit', name: 'AI 审计', description: '', state: 'offline', role: roleOf('AI 审计') },
+      ],
+      online: 1, busy: 0, offline: 1,
+    }
+    const { view } = setup(state)
+
+    // Counts read the role roster: one online role member, one offline.
+    expect(view.getAllByText('1')).toHaveLength(2)
+    expect(view.getByText('AI 秘书')).toBeTruthy()
+    expect(view.getByText('AI 审计')).toBeTruthy()
+    expect(view.queryByText('标准模式')).toBeNull()
+    expect(view.queryByText('经营团队')).toBeNull()
   })
 
   it('reads the roster on first render and shows the loading line', async () => {

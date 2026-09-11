@@ -4,12 +4,14 @@
  *
  * The tab is deployment-wide, so it reads the controller snapshot the hero and
  * the team page already share. Member state is the same fold those surfaces
- * show; the tab only renders it in a narrower column.
+ * show, and the list presents the company's role roster — the same
+ * `roleMembers` fold — so mode and other non-role presets stay out of the
+ * team's status; the tab only renders it in a narrower column.
  */
 import { useEffect, type ReactNode } from 'react'
 import { IconAgentPresetOutline16, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { memberDotState, type TeamMemberState } from '../workbench-store.ts'
+import { memberDotState, roleMembers, type TeamMemberState } from '../workbench-store.ts'
 import type { TeamStatusInjected } from './tab-face.ts'
 import type {} from '../locales.ts'
 import css from './WorkbenchTabs.module.css'
@@ -30,6 +32,7 @@ export type TeamStatusTabProps =
  */
 export function TeamStatusTab({ useWorkbench, load, t }: TeamStatusTabProps): ReactNode {
   const state = useWorkbench(snapshot => snapshot)
+  const roster = roleMembers(state.members)
 
   useEffect(() => {
     if (state.status === 'idle') void load()
@@ -39,7 +42,7 @@ export function TeamStatusTab({ useWorkbench, load, t }: TeamStatusTabProps): Re
     ? <p className={css.empty} role="alert">{t('tab.team.error', { message: state.error })}</p>
     : state.status === 'idle' || state.status === 'loading'
       ? <p className={css.empty}>{t('tab.team.loading')}</p>
-      : state.members.length === 0
+      : roster.length === 0
         ? <p className={css.empty}>{t('tab.team.empty')}</p>
         : (
           <>
@@ -58,7 +61,7 @@ export function TeamStatusTab({ useWorkbench, load, t }: TeamStatusTabProps): Re
               })}
             </div>
             <ul className={css.list}>
-              {state.members.map(member => (
+              {roster.map(member => (
                 <li key={member.id} className={css.entry}>
                   <span className={css.dotSlot}><StateDot state={memberDotState(member.state)} /></span>
                   <span className={css.rowName}>{member.name}</span>
