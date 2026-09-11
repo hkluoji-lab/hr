@@ -1,11 +1,11 @@
 /**
  * The hero's right-side card stack: bounty credits, AI-team presence, task
  * progress, and deliverables. The app frame only mounts the right column for
- * an open session, so on the blank-session hero this stack floats over the
- * centre column's right gutter on wide viewports (CSS fixed positioning) and
- * stays hidden on narrow ones. Presence reads the shared workbench snapshot;
- * the bounty balance, progress rows, and deliverables are typed placeholders
- * (hero-demo.ts) reproducing the design pending their data seams.
+ * an open session, so on the blank-session hero this stack is the hero grid's
+ * second column on wide viewports and stays hidden on narrow ones. Presence
+ * reads the shared workbench snapshot; the bounty balance, progress rows, and
+ * deliverables are typed placeholders (hero-demo.ts) reproducing the design
+ * pending their data seams.
  */
 import type { ReactNode } from 'react'
 import { IconChevronDownOutline14, IconDownloadOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -39,7 +39,7 @@ function points(value: number): string {
 /**
  * Render the four stacked hero cards.
  * @param props - the snapshot slice and the translate seat.
- * @returns the fixed-position card stack.
+ * @returns the hero grid's side-card column.
  */
 export function HeroSideCards({ state, t }: HeroSideCardsProps): ReactNode {
   // The hero bounty card reproduces the design mock until its data seam lands;

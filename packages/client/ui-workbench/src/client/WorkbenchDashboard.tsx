@@ -5,8 +5,8 @@
  * as role member cards. Every role card starts a session composed for that
  * member; the dashboard renders the greeting and quick actions even when the
  * deployment composes no presets. On wide viewports the bounty/status/
- * progress/deliverables card stack floats in the centre column's right
- * gutter (HeroSideCards).
+ * progress/deliverables card stack fills the hero grid's second column
+ * (HeroSideCards).
  */
 import { useEffect, useRef } from 'react'
 import {
@@ -112,58 +112,60 @@ export function WorkbenchDashboard({
 
   return (
     <section ref={sectionRef} className={css.root} data-workbench-hero="" aria-label={t('team.brand')}>
+      <div className={css.main}>
+        <h2 className={css.greeting}>
+          <span>{t(greetingKey(new Date().getHours()))}</span>
+          <span className={css.userName}>{t('greeting.name')}</span>
+          <span>。{t('greeting.suffix')}</span>
+        </h2>
+        <p className={css.subtitle}>
+          {t('subtitle', { todo: state.todayCount, online: activeStaff })}
+        </p>
+
+        <div className={css.quickGrid}>
+          {QUICK_ACTIONS.map((action) => {
+            const Icon = action.icon
+            return (
+              <button
+                key={action.key}
+                type="button"
+                className={css.quickCard}
+                onClick={() => { action.run({ startTask, viewProjects, openPage }) }}
+              >
+                <span className={css.quickIcon}><Icon size={18} /></span>
+                <span className={css.quickLabel}>{t(`quick.${action.key}`)}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        <dl className={css.stats}>
+          {stats.map(stat => (
+            <div key={stat.key} className={css.stat}>
+              <dt className={css.statLabel}>{t(stat.key)}</dt>
+              <dd className={css.statValue}>{stat.value}</dd>
+            </div>
+          ))}
+        </dl>
+
+        <div className={css.teamHeader}>
+          <span className={css.teamLine} />
+          <span className={css.teamTitle}>{t('team.brand')}</span>
+          <span className={css.teamLine} />
+        </div>
+
+        {state.status === 'unavailable'
+          ? <p className={css.teamEmpty}>{t('team.empty')}</p>
+          : (
+              <div className={css.memberGrid}>
+                {roster.map(member => (
+                  <MemberCard key={member.id} member={member} onStart={startWithPreset} t={t} />
+                ))}
+              </div>
+            )}
+      </div>
+
       <HeroSideCards state={state} t={t} />
-
-      <h2 className={css.greeting}>
-        <span>{t(greetingKey(new Date().getHours()))}</span>
-        <span className={css.userName}>{t('greeting.name')}</span>
-        <span>。{t('greeting.suffix')}</span>
-      </h2>
-      <p className={css.subtitle}>
-        {t('subtitle', { todo: state.todayCount, online: activeStaff })}
-      </p>
-
-      <div className={css.quickGrid}>
-        {QUICK_ACTIONS.map((action) => {
-          const Icon = action.icon
-          return (
-            <button
-              key={action.key}
-              type="button"
-              className={css.quickCard}
-              onClick={() => { action.run({ startTask, viewProjects, openPage }) }}
-            >
-              <span className={css.quickIcon}><Icon size={18} /></span>
-              <span className={css.quickLabel}>{t(`quick.${action.key}`)}</span>
-            </button>
-          )
-        })}
-      </div>
-
-      <dl className={css.stats}>
-        {stats.map(stat => (
-          <div key={stat.key} className={css.stat}>
-            <dt className={css.statLabel}>{t(stat.key)}</dt>
-            <dd className={css.statValue}>{stat.value}</dd>
-          </div>
-        ))}
-      </dl>
-
-      <div className={css.teamHeader}>
-        <span className={css.teamLine} />
-        <span className={css.teamTitle}>{t('team.brand')}</span>
-        <span className={css.teamLine} />
-      </div>
-
-      {state.status === 'unavailable'
-        ? <p className={css.teamEmpty}>{t('team.empty')}</p>
-        : (
-          <div className={css.memberGrid}>
-            {roster.map(member => (
-              <MemberCard key={member.id} member={member} onStart={startWithPreset} t={t} />
-            ))}
-          </div>
-        )}
     </section>
   )
 }

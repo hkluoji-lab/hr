@@ -14,11 +14,39 @@
   color: #2a2230;
 }
 
-/* While the right-side card stack floats in the centre gutter, reserve its
-   space and centre the content in what remains. */
+/* The hero content column; below the wide breakpoint it is the whole hero. */
+.main {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 18px;
+  min-width: 0;
+}
+
+/* Wide viewports give the side-card stack a real grid column so the core
+   workspace row below the hero keeps its full width untouched. Hero content
+   keeps the 600px reading measure while the member row fills the column. */
 @media (min-width: 1300px) {
   .root {
-    margin-right: 316px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 288px;
+    gap: 28px;
+    align-items: start;
+    max-width: none;
+    margin: 6px 24px 4px;
+  }
+
+  .main {
+    width: auto;
+  }
+
+  .main > * {
+    max-width: 600px;
+    margin-inline: auto;
+  }
+
+  .main > .memberGrid {
+    max-width: none;
   }
 }
 
@@ -151,17 +179,10 @@
   color: #978da2;
 }
 
-/* The role row spreads wider than the quick actions on wide frames, ending
-   where the floating card stack begins. */
+/* The role row spreads wider than the quick actions; on wide frames it fills
+   the hero's content column beside the side-card stack. */
 .memberGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
   gap: 16px;
-}
-
-@media (min-width: 1300px) {
-  .memberGrid {
-    width: min(880px, calc(100vw - 648px));
-    align-self: center;
-  }
 }

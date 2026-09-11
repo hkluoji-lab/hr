@@ -3,7 +3,7 @@
  * WorkbenchDashboard rendering: the time-aware greeting with the user name,
  * the todo/presence subtitle, the stat strip, the four quick actions (start
  * vs sidebar routes), the role-ordered team cards — enabled for live members,
- * disabled for offline ones — the floating right-side cards, and the
+ * disabled for offline ones — the wide-viewport side-card column, and the
  * empty-deployment note.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

@@ -1,6 +1,7 @@
-/* The blank-session hero's right-side card stack. The frame mounts the right
-   column only for an open session, so on the hero the stack floats over the
-   centre column's right gutter; narrow viewports hide it entirely. */
+/* The blank-session hero's right-side card stack. The stack is the second
+   column of the hero grid on wide viewports and stays in flow there, so it
+   never overlaps the core workspace row below the hero; narrow viewports hide
+   it entirely. */
 
 .root {
   display: none;
@@ -8,18 +9,11 @@
 
 @media (min-width: 1300px) {
   .root {
-    position: fixed;
-    top: 12px;
-    right: 14px;
-    bottom: 112px;
-    z-index: 6;
     display: flex;
     flex-direction: column;
     gap: 12px;
-    width: 288px;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    pointer-events: auto;
+    width: auto;
+    min-width: 0;
   }
 }
 
