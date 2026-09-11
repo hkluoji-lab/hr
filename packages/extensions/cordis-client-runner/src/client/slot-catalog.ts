@@ -2031,10 +2031,11 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     declaredBy: 'an entry in \'sidebar\' (client-ui-sidebar), so it exists while that entry is mounted',
     occupants: [
       'client-ui-brand-official OfficialBrandMark',
+      'client-ui-workbench SidebarBrandMark',
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar.brand.mark\', () => ctx.slots.register(\n      { name: \'sidebar.brand.mark\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:23',
+    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:24',
   },
   {
     key: 'sidebar.brand.name',
@@ -2060,10 +2061,11 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     declaredBy: 'an entry in \'sidebar\' (client-ui-sidebar), so it exists while that entry is mounted',
     occupants: [
       'client-ui-brand-official OfficialBrandName',
+      'client-ui-workbench SidebarBrandName',
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar.brand.name\', () => ctx.slots.register(\n      { name: \'sidebar.brand.name\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:28',
+    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:29',
   },
   {
     key: 'sidebar.footer.action',
@@ -2107,12 +2109,59 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: '',
     declaredBy: 'an entry in \'sidebar\' (client-ui-sidebar), so it exists while that entry is mounted',
     occupants: [
-      'client-ui-workbench WorkbenchNavAction',
       'client-ui-cordis CordisPanel id \'cordis-panel\'',
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar.footer.action\', () => ctx.slots.register(\n      { name: \'sidebar.footer.action\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:46',
+    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:54',
+  },
+  {
+    key: 'sidebar.nav',
+    kind: 'list',
+    scope: 'root',
+    summary: 'The product\'s primary navigation, between New Session and the browsing region.',
+    doc: 'The product\'s primary navigation, between New Session and the browsing\nregion. Declared by this package\'s \'sidebar\' entry; ui-workbench\nregisters the workbench entries. The sidebar passes only its column\nstate — it holds no navigation state.',
+    registerOptions: [
+      {
+        name: 'id',
+        requirement: 'required',
+        type: 'string',
+        doc: 'Your cell key. Use an id of your own: a fresh id is added beside the shipped entries, while reusing a shipped id puts you in THAT cell and replaces it. Owners that filter by id address you by it.',
+      },
+      {
+        name: 'order',
+        requirement: 'optional',
+        type: 'number',
+        doc: 'Position among the entries, ascending (default 0).',
+      },
+      {
+        name: 'label',
+        requirement: 'optional',
+        type: 'string | (() => string)',
+        doc: 'Display text where the owner projects one (nav rows, tabs). A thunk is re-read on every projection, so localized text follows the active locale without re-registering.',
+      },
+    ],
+    ownerProps: [
+      '/**\n * Owner share of the navigation seat: the column display state each entry\n * renders against (wide row vs rail icon).\n */\nexport interface SidebarNavOwnerProps {\n  /** Whether the sidebar renders wide content (false = 56px rail). */\n  wide: boolean\n}',
+    ],
+    ownerPropsReferences: [],
+    standardProps: [
+      'useResource: UseResource',
+      'useWorkspaces: SnapshotSelectorHook<WorkspaceSnapshot>',
+      'useSessions: UseSessions',
+      'useSessionPendingInteraction: UseSessionPendingInteraction',
+      'useWorkspaces: SnapshotSelectorHook<WorkspaceSnapshot>',
+    ],
+    keyDomain: '',
+    hookContext: '',
+    slotInject: '',
+    declaredBy: 'an entry in \'sidebar\' (client-ui-sidebar), so it exists while that entry is mounted',
+    occupants: [
+      'client-ui-workbench WorkbenchNavAction',
+    ],
+    replaceRisk: 'none',
+    example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar.nav\', () => ctx.slots.register(\n      { name: \'sidebar.nav\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
+    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:36',
   },
   {
     key: 'sidebar.right.pane.tab',
@@ -2325,7 +2374,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar.settings\', () => ctx.slots.register(\n      { name: \'sidebar.settings\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:41',
+    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:49',
   },
   {
     key: 'sidebar.workspaces',
@@ -2354,7 +2403,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar.workspaces\', () => ctx.slots.register(\n      { name: \'sidebar.workspaces\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:35',
+    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:43',
   },
   {
     key: 'sidebar.workspaces.directoryFlow',

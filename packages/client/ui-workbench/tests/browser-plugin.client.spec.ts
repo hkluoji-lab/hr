@@ -1,8 +1,9 @@
 /**
  * ui-workbench plugin halves: the browser entry registers its dictionaries,
  * its four right-Sidebar tab types with their bodies, its hero dashboard, its
- * five sidebar nav entries, and the page surface (all removed on fiber
- * teardown — HMR safety); the node entry stays inert.
+ * two sidebar brand occupants, its five sidebar nav entries, and the page
+ * surface (all removed on fiber teardown — HMR safety); the node entry stays
+ * inert.
  */
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
@@ -18,6 +19,7 @@ import {
 import { apply as applyNode } from '../src/index.ts'
 import { WorkbenchDashboard } from '../src/client/WorkbenchDashboard.tsx'
 import { WorkbenchShell } from '../src/client/WorkbenchShell.tsx'
+import { SidebarBrandMark, SidebarBrandName } from '../src/client/SidebarBrand.tsx'
 import { CreditsTab } from '../src/client/tabs/CreditsTab.tsx'
 import { DeliverablesTab } from '../src/client/tabs/DeliverablesTab.tsx'
 import { ProgressTab } from '../src/client/tabs/ProgressTab.tsx'
@@ -40,7 +42,7 @@ function sessionsDouble(): { double: unknown; notify: () => void } {
     clear: () => {},
     open: () => {},
     list: {
-      getSnapshot: () => ({ current: undefined, byId: {} }),
+      getSnapshot: () => ({ current: undefined, ids: [], byId: {} }),
       subscribe: (listener: () => void) => {
         listeners.add(listener)
         return () => { listeners.delete(listener) }
@@ -79,7 +81,9 @@ async function bench(): Promise<{
   ctx.slots.register({
     name: 'sidebar',
     children: {
-      'sidebar.footer.action': { kind: 'list', scope: 'root' },
+      'sidebar.brand.mark': { kind: 'single', scope: 'root' },
+      'sidebar.brand.name': { kind: 'single', scope: 'root' },
+      'sidebar.nav': { kind: 'list', scope: 'root' },
     },
   } as never, () => null)
   ctx.provide('conversation', {})
@@ -169,11 +173,18 @@ describe('ui-workbench browser half', () => {
     expect(entries[0]!.component).toBe(WorkbenchDashboard)
     expect(dashboardIds(ctx)).toContain('workbench')
 
-    // Five additive sidebar foot entries ride the same plugin fiber.
-    expect(ctx.slots.entries('sidebar.footer.action').map(entry => entry.options.id))
+    // Five additive sidebar nav entries ride the same plugin fiber, in the
+    // design's order: task hall, task assistant, active tasks, AI team, projects.
+    expect(ctx.slots.entries('sidebar.nav').map(entry => entry.options.id))
       .toEqual([
-        'workbench-home', 'workbench-hall', 'workbench-assistant', 'workbench-team', 'workbench-report',
+        'workbench-hall', 'workbench-assistant', 'workbench-active',
+        'workbench-team', 'workbench-projects',
       ])
+
+    // The two deployment-brand occupants replace the shell brand fallbacks.
+    // Both are `single` slots, so they carry no entry id.
+    expect(ctx.slots.entries('sidebar.brand.mark')[0]!.component).toBe(SidebarBrandMark)
+    expect(ctx.slots.entries('sidebar.brand.name')[0]!.component).toBe(SidebarBrandName)
 
     const overlay = ctx.slots.entries('shell.overlay')
     expect(overlay.map(entry => entry.options.id)).toEqual(['workbench-pages'])
@@ -181,7 +192,9 @@ describe('ui-workbench browser half', () => {
 
     await fiber.dispose()
     expect(dashboardIds(ctx)).not.toContain('workbench')
-    expect(ctx.slots.entries('sidebar.footer.action')).toHaveLength(0)
+    expect(ctx.slots.entries('sidebar.nav')).toHaveLength(0)
+    expect(ctx.slots.entries('sidebar.brand.mark')).toHaveLength(0)
+    expect(ctx.slots.entries('sidebar.brand.name')).toHaveLength(0)
     expect(ctx.slots.entries('shell.overlay')).toHaveLength(0)
   })
 
@@ -223,10 +236,11 @@ describe('ui-workbench browser half', () => {
     shell.close()
     expect(shell.hooks.pages.getSnapshot().open).toBeNull()
 
-    const nav = ctx.slots.entries('sidebar.footer.action')[0]!
+    const nav = ctx.slots.entries('sidebar.nav')[0]!
       .inject!() as unknown as WorkbenchNavInjected
-    expect(nav.target).toBe('home')
+    expect(nav.target).toBe('hall')
     nav.activate()
+    expect(shell.hooks.pages.getSnapshot().open).toBe('hall')
 
     await fiber.dispose()
   })

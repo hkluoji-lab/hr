@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 /**
- * The workbench page surface: the hall's rows, the task assistant's brief
- * form, the team grid, the report's metrics/ledger/grant form, and the shell
- * that hosts them — closed state, Escape/close dismissal, and the reads an
- * open page triggers.
+ * The workbench page surface: the hall's rows, the active-tasks filter, the
+ * task assistant's brief form, the team grid, the report's
+ * metrics/ledger/grant form, and the shell that hosts them — closed state,
+ * Escape/close dismissal, and the reads an open page triggers.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, act } from '@testing-library/react'
@@ -28,12 +28,13 @@ afterEach(() => {
 })
 
 const MEMBERS: readonly TeamMember[] = [
-  { id: 'standard', name: '标准模式', description: '完整工具集', state: 'online' },
-  { id: 'minimal', name: '极简模式', description: '', state: 'busy' },
+  { id: 'standard', name: '标准模式', description: '完整工具集', state: 'online', role: undefined },
+  { id: 'minimal', name: '极简模式', description: '', state: 'busy', role: undefined },
 ]
 
 const READY: WorkbenchState = {
   status: 'ready', error: null, members: MEMBERS, online: 1, busy: 1, offline: 0, credits: 1280,
+  todayCount: 2, runningCount: 1, doneCount: 1,
 }
 
 /** One hall row shaped like the fold's product. */
@@ -148,7 +149,7 @@ describe('AssistantPage', () => {
   it('refuses to assign to an offline member', () => {
     const offline: WorkbenchState = {
       ...READY,
-      members: [{ id: 'broken', name: '失效预设', description: '挂了', state: 'offline' }],
+      members: [{ id: 'broken', name: '失效预设', description: '挂了', state: 'offline', role: undefined }],
     }
     render(<AssistantPage state={offline} onAssign={vi.fn()} t={assistantT} />)
 
@@ -268,6 +269,22 @@ describe('WorkbenchShell', () => {
     render(<WorkbenchShell {...props('hall', { close })} />)
     fireEvent.keyDown(document, { key: 'Enter' })
     expect(close).not.toHaveBeenCalled()
+  })
+
+  it('lists only running tasks on the active-tasks page', () => {
+    const tasks = [
+      row({ id: 's1' as never, title: '运行中的任务', status: 'running' }),
+      row({ id: 's2' as never, title: '已完成的任务', status: 'done' }),
+    ]
+    render(<WorkbenchShell {...props('active', { useTasks: () => tasks })} />)
+    expect(screen.getByRole('heading', { name: zh['nav.active'] })).toBeTruthy()
+    expect(screen.getByText('运行中的任务')).toBeTruthy()
+    expect(screen.queryByText('已完成的任务')).toBeNull()
+  })
+
+  it('notes an idle deployment on the active-tasks page', () => {
+    render(<WorkbenchShell {...props('active')} />)
+    expect(screen.getByText(zh['active.empty'])).toBeTruthy()
   })
 
   it('renders the AI team page over the frame', () => {

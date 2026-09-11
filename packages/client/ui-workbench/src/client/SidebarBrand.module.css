@@ -1,0 +1,51 @@
+/* Placeholder brand tile: pink gradient square with the 星 glyph until the
+   hexagon logo asset lands. The shell requests a 24px square. */
+.mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  background: linear-gradient(135deg, #f09acb 0%, #d674c2 100%);
+  box-shadow: 0 1px 3px rgba(201, 91, 169, 0.3);
+}
+
+.markGlyph {
+  color: #ffffff;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+/* Wordmark row: brand name with the red 秘 badge at its top-right corner. */
+.name {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  min-width: 0;
+}
+
+.wordmark {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 24px;
+  letter-spacing: 0.04em;
+  color: #2b2430;
+  white-space: nowrap;
+}
+
+.badge {
+  position: absolute;
+  top: -3px;
+  right: -15px;
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f26d7d 0%, #e8455c 100%);
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+}

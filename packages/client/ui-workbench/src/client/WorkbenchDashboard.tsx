@@ -1,25 +1,29 @@
 /**
- * The blank-session workbench dashboard: a time-aware greeting, a subtitle
- * counting the live AI team, four quick-action cards, and the agent-preset
- * roster rendered as team-member cards. Every member card starts a session
- * composed for that member; the dashboard renders the greeting and quick
- * actions even when the deployment composes no presets.
+ * The blank-session workbench dashboard: a time-aware greeting with the user
+ * name, a subtitle counting the day's work and the live AI team, four
+ * quick-action cards, a task-stat strip, and the agent-preset roster rendered
+ * as role member cards. Every role card starts a session composed for that
+ * member; the dashboard renders the greeting and quick actions even when the
+ * deployment composes no presets. On wide viewports the bounty/status/
+ * progress/deliverables card stack floats in the centre column's right
+ * gutter (HeroSideCards).
  */
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import {
   IconAgentPresetOutline16,
   IconDataOutline16,
   IconFolderOpenOutline16,
   IconPlusOutline16,
-  IconSparkle16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 // Type-only: pulls the ui-conversation SlotMap merge (the hero dashboard seat).
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { MemberCard } from './MemberCard.tsx'
-import type { WorkbenchPageId, WorkbenchState } from './workbench-store.ts'
-import { NS } from './locales.ts'
+import { HeroSideCards } from './HeroSideCards.tsx'
+import { ROLES } from './roles.ts'
+import type { TeamMember, WorkbenchPageId, WorkbenchState } from './workbench-store.ts'
+import { NS, type WorkbenchKey } from './locales.ts'
 import css from './WorkbenchDashboard.module.css'
 
 /** Registration-side business face for the hero dashboard. */
@@ -69,6 +73,19 @@ const QUICK_ACTIONS: readonly QuickAction[] = [
 ]
 
 /**
+ * Order the roster for hero display: the four company roles in their design
+ * order when the deployment composes them, otherwise every preset.
+ * @param members - the full roster from the snapshot.
+ * @returns the cards the hero presents.
+ */
+function heroMembers(members: readonly TeamMember[]): readonly TeamMember[] {
+  const roles = ROLES
+    .map(role => members.find(member => member.role?.id === role.id))
+    .filter((member): member is TeamMember => member !== undefined)
+  return roles.length > 0 ? roles : members
+}
+
+/**
  * Render the hero workbench dashboard.
  * @param props - composed slot props.
  * @returns the dashboard element tree.
@@ -77,26 +94,48 @@ export function WorkbenchDashboard({
   load, startTask, startWithPreset, viewProjects, openPage, useWorkbench, t,
 }: WorkbenchDashboardProps) {
   const state = useWorkbench(snapshot => snapshot)
+  const sectionRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     void load()
   }, [load])
 
+  // While this dashboard owns the blank-session hero, the conversation shell's
+  // brand headline and workspace-chip row are core siblings with no opt-out
+  // slot: hide them for this mount's lifetime and restore the inline value on
+  // teardown. Starting a session unmounts the hero anyway; the cleanup covers
+  // plugin/entry churn without leaving the core chrome permanently hidden.
+  useEffect(() => {
+    const slot = sectionRef.current?.parentElement
+    if (!slot) return
+    const chrome = [slot.previousElementSibling, slot.nextElementSibling]
+      .filter((node): node is HTMLElement => node instanceof HTMLElement)
+    const previous = chrome.map(el => ({ el, display: el.style.display }))
+    chrome.forEach(el => { el.style.display = 'none' })
+    return () => { previous.forEach(({ el, display }) => { el.style.display = display }) }
+  }, [])
+
+  const roster = heroMembers(state.members)
+  const activeStaff = state.online + state.busy
+  const stats: ReadonlyArray<{ key: WorkbenchKey; value: string }> = [
+    { key: 'stat.today', value: String(state.todayCount) },
+    { key: 'stat.running', value: String(state.runningCount) },
+    { key: 'stat.done', value: String(state.doneCount) },
+    { key: 'stat.active', value: `${activeStaff}/${state.members.length}` },
+  ]
+
   return (
-    <section className={css.root} aria-label={t('team.title')}>
-      <h2 className={css.greeting}>{t(greetingKey(new Date().getHours()))}</h2>
-      <div className={css.subtitleRow}>
-        <p className={css.subtitle}>
-          {t('subtitle', { online: state.online + state.busy, busy: state.busy })}
-        </p>
-        {state.credits !== null && (
-          <span className={css.credits}>
-            <IconSparkle16 size={14} />
-            <span className={css.creditsValue}>{state.credits}</span>
-            <span className={css.creditsLabel}>{t('credits.label')}</span>
-          </span>
-        )}
-      </div>
+    <section ref={sectionRef} className={css.root} data-workbench-hero="" aria-label={t('team.brand')}>
+      <HeroSideCards state={state} t={t} />
+
+      <h2 className={css.greeting}>
+        <span>{t(greetingKey(new Date().getHours()))}</span>
+        <span className={css.userName}>{t('greeting.name')}</span>
+        <span>。{t('greeting.suffix')}</span>
+      </h2>
+      <p className={css.subtitle}>
+        {t('subtitle', { todo: state.todayCount, online: activeStaff })}
+      </p>
 
       <div className={css.quickGrid}>
         {QUICK_ACTIONS.map((action) => {
@@ -115,9 +154,18 @@ export function WorkbenchDashboard({
         })}
       </div>
 
+      <dl className={css.stats}>
+        {stats.map(stat => (
+          <div key={stat.key} className={css.stat}>
+            <dt className={css.statLabel}>{t(stat.key)}</dt>
+            <dd className={css.statValue}>{stat.value}</dd>
+          </div>
+        ))}
+      </dl>
+
       <div className={css.teamHeader}>
         <span className={css.teamLine} />
-        <span className={css.teamTitle}>{t('team.title')}</span>
+        <span className={css.teamTitle}>{t('team.brand')}</span>
         <span className={css.teamLine} />
       </div>
 
@@ -125,7 +173,7 @@ export function WorkbenchDashboard({
         ? <p className={css.teamEmpty}>{t('team.empty')}</p>
         : (
           <div className={css.memberGrid}>
-            {state.members.map(member => (
+            {roster.map(member => (
               <MemberCard key={member.id} member={member} onStart={startWithPreset} t={t} />
             ))}
           </div>

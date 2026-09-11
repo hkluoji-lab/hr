@@ -1,39 +1,46 @@
 /**
- * A sidebar-foot nav entry for one workbench surface: the hero dashboard
- * (`home`) or one frame-wide page. Every entry is additive in the
- * `sidebar.footer.action` list, so the sidebar shell and its workspace and
- * settings regions stay untouched. The rail shows the target's glyph with a
- * tooltip; the wide column adds the label, like the Settings trigger.
+ * A sidebar navigation entry for one workbench surface: the design's primary
+ * list under New Session. Every entry is additive in the `sidebar.nav` list, so
+ * the sidebar shell keeps ownership of the brand row, the New Session control,
+ * and the browsing region. The rail shows the target's glyph with a tooltip;
+ * the wide column adds the label.
+ *
+ * Four targets toggle a frame-wide page; `projects` is a command that reveals
+ * the sidebar's own project/Workspace browser instead of covering the frame.
  */
 import { useSyncExternalStore } from 'react'
 import {
   IconAgentPresetOutline16,
-  IconDataOutline16,
-  IconGaugeOutline16,
+  IconFolderClose16,
   IconListPenOutline16,
+  IconPlayOutline16,
   IconSparkle16,
   Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-// Type-only: pulls the ui-sidebar SlotMap merge (the footer-action seat).
+// Type-only: pulls the ui-sidebar SlotMap merge (the navigation seat).
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { WorkbenchController, WorkbenchPageId } from './workbench-store.ts'
 import { NS, type WorkbenchKey } from './locales.ts'
 import css from './WorkbenchNavAction.module.css'
 
-/** A surface a sidebar-foot entry activates. */
-export type WorkbenchNavTarget = 'home' | WorkbenchPageId
+/** A surface a sidebar navigation entry activates. */
+export type WorkbenchNavTarget = 'hall' | 'assistant' | 'active' | 'team' | 'projects'
 
-/** Glyph and label of each nav target. */
-const TARGETS: Record<WorkbenchNavTarget, { readonly icon: typeof IconGaugeOutline16; readonly label: WorkbenchKey }> = {
-  home: { icon: IconGaugeOutline16, label: 'nav.home' },
-  hall: { icon: IconListPenOutline16, label: 'nav.hall' },
-  assistant: { icon: IconSparkle16, label: 'nav.assistant' },
-  team: { icon: IconAgentPresetOutline16, label: 'nav.team' },
-  report: { icon: IconDataOutline16, label: 'nav.report' },
+/** Glyph, label, and the page each nav target drives (null = command). */
+const TARGETS: Record<WorkbenchNavTarget, {
+  readonly icon: typeof IconListPenOutline16
+  readonly label: WorkbenchKey
+  readonly page: WorkbenchPageId | null
+}> = {
+  hall: { icon: IconListPenOutline16, label: 'nav.hall', page: 'hall' },
+  assistant: { icon: IconSparkle16, label: 'nav.assistant', page: 'assistant' },
+  active: { icon: IconPlayOutline16, label: 'nav.active', page: 'active' },
+  team: { icon: IconAgentPresetOutline16, label: 'nav.team', page: 'team' },
+  projects: { icon: IconFolderClose16, label: 'nav.projects', page: null },
 }
 
-/** Registration-side business face for one sidebar-foot nav entry. */
+/** Registration-side business face for one sidebar navigation entry. */
 export interface WorkbenchNavInjected {
   /** The surface this entry activates. */
   target: WorkbenchNavTarget
@@ -45,12 +52,12 @@ export interface WorkbenchNavInjected {
 
 /** Full component props. */
 export type WorkbenchNavActionProps =
-  PropsRuntime<'sidebar.footer.action'>
+  PropsRuntime<'sidebar.nav'>
   & PropsLocale<typeof NS>
   & InjectFace<WorkbenchNavInjected>
 
 /**
- * Render one workbench nav entry.
+ * Render one workbench navigation entry.
  * @param props - the sidebar's `wide` state plus this entry's face.
  * @returns the labelled row (wide) or the rail glyph button.
  */
@@ -77,51 +84,31 @@ export function WorkbenchNavAction({ wide, t, target, useActive, activate }: Wor
     : <Tooltip label={label} delayMs={500}>{button}</Tooltip>
 }
 
-/** The Session Controller slice a nav entry reads and clears. */
-export interface WorkbenchNavSessions {
-  /** Clear the current Session selection, landing on the hero. */
-  clear: () => void
-  list: {
-    subscribe: (listener: () => void) => () => void
-    getSnapshot: () => { current: string | undefined }
-  }
-}
-
 /**
- * Build one nav entry's face: `home` clears the session selection and closes
- * any page, a page target toggles that page, and the entry reports its own
- * active state from both stores.
- * @param sessions - the Session Controller service.
+ * Build one nav entry's face: a page target toggles that page and reports its
+ * own active state from the page store; the `projects` command reveals the
+ * sidebar and is never current.
  * @param controller - the workbench controller owning page state.
  * @param target - the surface this entry activates.
- * @returns the inject face for the footer slot.
+ * @returns the inject face for the navigation slot.
  */
 export function navActionFace(
-  sessions: WorkbenchNavSessions,
   controller: WorkbenchController,
   target: WorkbenchNavTarget,
 ): WorkbenchNavInjected {
-  const subscribe = (listener: () => void): (() => void) => {
-    const stopSessions = sessions.list.subscribe(listener)
-    const stopPages = controller.pages.subscribe(listener)
-    return () => {
-      stopSessions()
-      stopPages()
-    }
-  }
-  const active = (): boolean => target !== 'home'
-    ? controller.pages.getSnapshot().open === target
-    : controller.pages.getSnapshot().open === null && sessions.list.getSnapshot().current === undefined
+  const page = TARGETS[target].page
   return {
     target,
-    useActive: () => useSyncExternalStore(subscribe, active),
+    useActive: () => useSyncExternalStore(
+      listener => controller.pages.subscribe(listener),
+      () => page !== null && controller.pages.getSnapshot().open === page,
+    ),
     activate: () => {
-      if (target === 'home') {
-        controller.closePage()
-        sessions.clear()
+      if (page === null) {
+        controller.viewProjects()
         return
       }
-      controller.togglePage(target)
+      controller.togglePage(page)
     },
   }
 }

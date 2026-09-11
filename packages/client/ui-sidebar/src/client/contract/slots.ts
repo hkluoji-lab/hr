@@ -1,7 +1,8 @@
 /**
  * Sidebar slot contract: the registrant-side props composition for the
  * layout-owned `sidebar` slot, plus the holes this shell declares. The shell
- * owns column geometry (fold state machine, brand row, New Session);
+ * owns column geometry (fold state machine, brand row, New Session); the
+ * product's primary navigation is a `sidebar.nav` registrant's (ui-workbench),
  * everything between the section header and the list bottom is the
  * `sidebar.workspaces` registrant's (ui-workspace), and the foot is the
  * `sidebar.settings` registrant's (ui-settings), followed by optional footer
@@ -26,6 +27,13 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * package's `sidebar` entry; the shell supplies a generic text fallback.
      */
     'sidebar.brand.name': { kind: 'single'; scope: 'root'; owner: SidebarBrandNameOwnerProps }
+    /**
+     * The product's primary navigation, between New Session and the browsing
+     * region. Declared by this package's 'sidebar' entry; ui-workbench
+     * registers the workbench entries. The sidebar passes only its column
+     * state — it holds no navigation state.
+     */
+    'sidebar.nav': { kind: 'list'; scope: 'root'; owner: SidebarNavOwnerProps }
     /**
      * The workspace/session browsing region: section header, search, the
      * grouped/flat session list, and every workspace dialog. Declared by this
@@ -57,6 +65,15 @@ export interface SidebarBrandMarkOwnerProps {
 export interface SidebarBrandNameOwnerProps {
   /** Marker field: the occupant owns its own content and width. */
   children?: never
+}
+
+/**
+ * Owner share of the navigation seat: the column display state each entry
+ * renders against (wide row vs rail icon).
+ */
+export interface SidebarNavOwnerProps {
+  /** Whether the sidebar renders wide content (false = 56px rail). */
+  wide: boolean
 }
 
 /**
@@ -111,6 +128,7 @@ export type SidebarRootComponentProps =
   & PropsRenderSlots<
     | 'sidebar.brand.mark'
     | 'sidebar.brand.name'
+    | 'sidebar.nav'
     | 'sidebar.workspaces'
     | 'sidebar.settings'
     | 'sidebar.footer.action'

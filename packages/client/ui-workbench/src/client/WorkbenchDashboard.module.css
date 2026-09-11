@@ -1,84 +1,70 @@
-/* Workbench hero dashboard: pink/purple enterprise-home treatment. Scoped to
-   the blank-session hero; every color carries a fallback so the card stays
+/* Workbench hero dashboard: the pink/purple secretary-company home. Scoped to
+   the blank-session hero; every color carries a fallback so the page stays
    legible under a theme that redefines the surface tokens. */
 
 .root {
   width: 100%;
-  max-width: 720px;
-  margin: 8px auto 4px;
+  max-width: 600px;
+  margin: 6px auto 4px;
   padding: 0 24px;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 18px;
-  color: var(--dsh-fg, #1f2329);
+  color: #2a2230;
+}
+
+/* While the right-side card stack floats in the centre gutter, reserve its
+   space and centre the content in what remains. */
+@media (min-width: 1300px) {
+  .root {
+    margin-right: 316px;
+  }
 }
 
 .greeting {
   margin: 0;
   text-align: center;
-  font-size: 26px;
+  font-size: 30px;
   font-weight: 700;
   line-height: 1.35;
   letter-spacing: 0.01em;
+  color: #2b2430;
 }
 
-.subtitleRow {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
+.userName {
+  color: #dd5d99;
 }
 
 .subtitle {
   margin: 0;
   text-align: center;
-  font-size: 13px;
-  color: var(--dsh-fg-muted, #8a8f99);
-}
-
-.credits {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--dsh-fg-muted, #8a8f99);
-  background: var(--dsw-alias-interactive-bg-hover, rgba(139, 92, 246, 0.1));
-}
-
-.creditsValue {
-  font-weight: 600;
-  color: var(--dsh-fg, #1f2329);
-}
-
-.creditsLabel {
-  white-space: nowrap;
+  font-size: 13.5px;
+  color: #978da2;
 }
 
 .quickGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
 }
 
 .quickCard {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px 18px;
-  border: 1px solid var(--dsh-border, #eceef2);
-  border-radius: 14px;
-  background: var(--dsh-surface, #ffffff);
+  gap: 13px;
+  padding: 17px 20px;
+  border: 1px solid #eee8f2;
+  border-radius: 15px;
+  background: #ffffff;
   cursor: pointer;
   text-align: left;
   transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
 .quickCard:hover {
-  border-color: var(--dsh-accent, #b478e8);
-  box-shadow: 0 6px 18px rgba(180, 120, 232, 0.14);
+  border-color: #d9b8e6;
+  box-shadow: 0 8px 22px rgba(180, 120, 232, 0.14);
   transform: translateY(-1px);
 }
 
@@ -86,48 +72,96 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 42px;
+  height: 42px;
   flex: none;
-  border-radius: 10px;
-  background: var(--dsh-accent-soft, #f3eafd);
-  color: var(--dsh-accent, #9a5cd6);
+  border-radius: 12px;
+  background: #f2ebfb;
+  color: #8f63d6;
 }
 
 .quickLabel {
-  font-size: 15px;
+  font-size: 15.5px;
   font-weight: 600;
+  color: #37303d;
+}
+
+.stats {
+  margin: 2px 0 0;
+  padding: 14px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  border-top: 1px dashed #e7e0ea;
+  border-bottom: 1px dashed #e7e0ea;
+}
+
+.stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 0 22px;
+}
+
+.stat + .stat {
+  border-left: 1px solid #eee9f1;
+}
+
+.statLabel {
+  margin: 0;
+  font-size: 13px;
+  color: #978da2;
+  white-space: nowrap;
+}
+
+.statValue {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #37303d;
+  font-variant-numeric: tabular-nums;
 }
 
 .teamHeader {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-top: 6px;
+  gap: 16px;
+  margin-top: 4px;
 }
 
 .teamLine {
   flex: 1;
   height: 1px;
-  background: var(--dsh-border, #eceef2);
+  background: #ece5ef;
 }
 
 .teamTitle {
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
-  color: var(--dsh-fg-muted, #8a8f99);
+  color: #978da2;
   letter-spacing: 0.08em;
+  white-space: nowrap;
 }
 
 .teamEmpty {
   margin: 0;
   text-align: center;
   font-size: 13px;
-  color: var(--dsh-fg-muted, #8a8f99);
+  color: #978da2;
 }
 
+/* The role row spreads wider than the quick actions on wide frames, ending
+   where the floating card stack begins. */
 .memberGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+  gap: 16px;
+}
+
+@media (min-width: 1300px) {
+  .memberGrid {
+    width: min(880px, calc(100vw - 648px));
+    align-self: center;
+  }
 }

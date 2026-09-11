@@ -8,6 +8,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { timeLabel } from '../time-label.ts'
 import type { TaskRow, TeamMember } from '../workbench-store.ts'
+import type { WorkbenchKey } from '../locales.ts'
 import css from './WorkbenchPages.module.css'
 
 /** Everything the hall renders from. */
@@ -20,6 +21,8 @@ export interface TaskHallPageProps {
   now: number
   /** Select one session and leave the hall. */
   onOpen: (id: SessionId) => void
+  /** Empty-state key; the active-tasks page reuses this list for running rows. */
+  emptyKey?: WorkbenchKey
   /** Namespace-bound translate. */
   t: TranslateNS<'workbench'>
 }
@@ -35,11 +38,11 @@ function dotState(status: TaskRow['status']): StateDotState {
 
 /**
  * Render the task hall.
- * @param props - rows, roster, clock, and the open action.
+ * @param props - rows, roster, clock, the open action, and the empty-state key.
  * @returns the row list, or the empty note when no task started.
  */
-export function TaskHallPage({ tasks, members, now, onOpen, t }: TaskHallPageProps) {
-  if (tasks.length === 0) return <p className={css.empty}>{t('hall.empty')}</p>
+export function TaskHallPage({ tasks, members, now, onOpen, emptyKey = 'hall.empty', t }: TaskHallPageProps) {
+  if (tasks.length === 0) return <p className={css.empty}>{t(emptyKey)}</p>
   const names = new Map(members.map(member => [member.id, member.name]))
   return (
     <ul className={css.taskList}>

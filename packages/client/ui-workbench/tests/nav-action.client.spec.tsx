@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 /**
- * WorkbenchNavAction: one additive sidebar foot entry per workbench surface.
- * The wide row renders the labelled control and the rail renders the icon-only
- * button (Tooltip wraps it). Each face derives its active state from the page
- * and session stores and drives home (clear the session) or toggles its page.
+ * WorkbenchNavAction: one additive sidebar navigation entry per workbench
+ * surface, rendered in the shell's navigation seat under New Session. The wide
+ * row renders the labelled control and the rail renders the icon-only button
+ * (Tooltip wraps it). Each page face derives its active state from the page
+ * store and toggles that page; the `projects` command reveals the sidebar
+ * instead and is never current.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
@@ -17,14 +19,7 @@ import { zh } from '../src/client/locales.ts'
 const t: WorkbenchNavActionProps['t'] = makeTranslate(zh)
 
 function props(over: Partial<WorkbenchNavActionProps>): WorkbenchNavActionProps {
-  return {
-    wide: true,
-    t,
-    target: 'hall',
-    useActive: () => false,
-    activate: vi.fn(),
-    ...over,
-  } as unknown as WorkbenchNavActionProps
+  return { wide: true, t, target: 'hall', useActive: () => false, activate: vi.fn(), ...over } as unknown as WorkbenchNavActionProps
 }
 
 afterEach(() => {
@@ -45,8 +40,8 @@ describe('WorkbenchNavAction', () => {
   })
 
   it('marks the entry current while its surface shows', () => {
-    render(<WorkbenchNavAction {...props({ target: 'report', useActive: () => true })} />)
-    expect(screen.getByRole('button', { name: zh['nav.report'] }).getAttribute('aria-current')).toBe('page')
+    render(<WorkbenchNavAction {...props({ target: 'active', useActive: () => true })} />)
+    expect(screen.getByRole('button', { name: zh['nav.active'] }).getAttribute('aria-current')).toBe('page')
   })
 
   it('renders an icon-only rail button', () => {
@@ -60,32 +55,11 @@ describe('WorkbenchNavAction', () => {
 })
 
 describe('navActionFace', () => {
-  /** Minimal Session Controller double: mutable selection plus listeners. */
-  function sessionsDouble(current: string | undefined) {
-    const listeners = new Set<() => void>()
-    const state = { current }
-    return {
-      state,
-      sessions: {
-        clear: vi.fn(() => {
-          state.current = undefined
-          for (const fn of listeners) fn()
-        }),
-        list: {
-          getSnapshot: () => state,
-          subscribe: (fn: () => void) => {
-            listeners.add(fn)
-            return () => { listeners.delete(fn) }
-          },
-        },
-      },
-    }
-  }
-
-  function face(target: WorkbenchNavTarget, current?: string) {
-    const bench = sessionsDouble(current)
-    const controller = new WorkbenchController({} as never)
-    return { ...bench, controller, face: navActionFace(bench.sessions, controller, target) }
+  /** Controller over a recorded layout double the specs observe. */
+  function bench() {
+    const toggleSidebar = vi.fn()
+    const controller = new WorkbenchController({ layout: { toggleSidebar } } as never)
+    return { controller, toggleSidebar, face: (target: WorkbenchNavTarget) => navActionFace(controller, target) }
   }
 
   /** Read a face's active selector inside a render, as uSES requires. */
@@ -99,40 +73,30 @@ describe('navActionFace', () => {
     return () => box.value
   }
 
-  it('home is active only on the hero: no page open and no current session', () => {
-    const { controller, sessions, state, face: home } = face('home', 's1')
-    const active = probe(home.useActive)
-    expect(active()).toBe(false)
-
-    act(() => { sessions.clear() })
-    expect(state.current).toBeUndefined()
-    expect(active()).toBe(true)
-
-    act(() => { controller.openPage('hall') })
-    expect(active()).toBe(false)
-  })
-
   it('a page entry is active exactly while its page is open, and toggles on activate', () => {
-    const { controller, face: hall } = face('hall')
-    const active = probe(hall.useActive)
+    const b = bench()
+    const entry = b.face('active')
+    const active = probe(entry.useActive)
     expect(active()).toBe(false)
 
-    act(() => { hall.activate() })
-    expect(controller.pages.getSnapshot().open).toBe('hall')
+    act(() => { entry.activate() })
+    expect(b.controller.pages.getSnapshot().open).toBe('active')
     expect(active()).toBe(true)
 
-    act(() => { hall.activate() })
-    expect(controller.pages.getSnapshot().open).toBeNull()
+    act(() => { entry.activate() })
+    expect(b.controller.pages.getSnapshot().open).toBeNull()
     expect(active()).toBe(false)
   })
 
-  it('home activate clears the session selection and closes any page', () => {
-    const { controller, sessions, state, face: home } = face('home', 's1')
-    controller.openPage('report')
+  it('the projects command reveals the sidebar and never reports itself current', () => {
+    const b = bench()
+    const entry = b.face('projects')
+    const active = probe(entry.useActive)
+    expect(active()).toBe(false)
 
-    home.activate()
-    expect(sessions.clear).toHaveBeenCalledTimes(1)
-    expect(state.current).toBeUndefined()
-    expect(controller.pages.getSnapshot().open).toBeNull()
+    act(() => { entry.activate() })
+    expect(b.toggleSidebar).toHaveBeenCalledTimes(1)
+    expect(b.controller.pages.getSnapshot().open).toBeNull()
+    expect(active()).toBe(false)
   })
 })

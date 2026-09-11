@@ -1,23 +1,38 @@
 // @vitest-environment jsdom
 /**
- * WorkbenchDashboard rendering: the time-aware greeting, the roster-count
- * subtitle, the four quick actions (start vs sidebar routes), and the team
- * cards — enabled for live members, disabled for offline ones — plus the
+ * WorkbenchDashboard rendering: the time-aware greeting with the user name,
+ * the todo/presence subtitle, the stat strip, the four quick actions (start
+ * vs sidebar routes), the role-ordered team cards — enabled for live members,
+ * disabled for offline ones — the floating right-side cards, and the
  * empty-deployment note.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { WorkbenchDashboard, type WorkbenchDashboardProps } from '../src/client/WorkbenchDashboard.tsx'
+import { roleOf, type RoleMeta } from '../src/client/roles.ts'
 import type { TeamMember, WorkbenchState } from '../src/client/workbench-store.ts'
 import { zh } from '../src/client/locales.ts'
 
 const t: WorkbenchDashboardProps['t'] = makeTranslate(zh)
 
-/** Build one member card model. */
+/** Build one member card model; role-less presets carry the generic mark. */
 function member(over: Partial<TeamMember> & Pick<TeamMember, 'id' | 'name'>): TeamMember {
-  return { description: '', state: 'online', ...over }
+  return {
+    description: '',
+    state: 'online',
+    role: roleOf(over.name) ?? undefined,
+    ...over,
+  }
 }
+
+/** A member carrying the named role's emoji/scope/tags metadata. */
+function roleMember(id: string, name: string, state: TeamMember['state'] = 'online'): TeamMember {
+  return member({ id, name, state, role: roleOf(name) as RoleMeta })
+}
+
+/** Task counters shared by the ready fixtures. */
+const COUNTS = { todayCount: 12, runningCount: 5, doneCount: 24 }
 
 const READY: WorkbenchState = {
   status: 'ready',
@@ -31,6 +46,7 @@ const READY: WorkbenchState = {
   busy: 1,
   offline: 1,
   credits: null,
+  ...COUNTS,
 }
 
 /** Pin the local clock to an hour and render the dashboard with recorder fns. */
@@ -59,38 +75,57 @@ afterEach(() => {
 })
 
 describe('WorkbenchDashboard hero copy', () => {
-  it('greets by local hour', () => {
+  it('greets by local hour with the highlighted user name', () => {
+    const expected = (hourKey: 'greeting.morning' | 'greeting.afternoon' | 'greeting.evening') =>
+      `${zh[hourKey]}${zh['greeting.name']}。${zh['greeting.suffix']}`
+
     const morning = setup(READY, 9)
-    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(zh['greeting.morning'])
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(expected('greeting.morning'))
     morning.unmount()
 
     setup(READY, 14)
-    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(zh['greeting.afternoon'])
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(expected('greeting.afternoon'))
     cleanup()
 
     setup(READY, 21)
-    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(zh['greeting.evening'])
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(expected('greeting.evening'))
   })
 
-  it('counts online as healthy-plus-busy and states the busy total', () => {
-    // online=2 + busy=1 → three agents reachable; one of them is working.
+  it('counts today\u2019s tasks and online staff (healthy plus busy)', () => {
+    // today=12; online=2 + busy=1 → three reachable agents.
     setup(READY, 10)
-    expect(screen.getByText('3 位 AI Agent 在线 · 1 位工作中')).toBeTruthy()
+    expect(screen.getByText('今天有 12 项待办 · 3 位 AI Agent 在线 · 数据已本地化')).toBeTruthy()
+  })
+
+  it('renders the stat strip counts including active staff over roster size', () => {
+    setup(READY, 10)
+    expect(screen.getByText('12')).toBeTruthy()
+    expect(screen.getByText('5')).toBeTruthy()
+    expect(screen.getByText('24')).toBeTruthy()
+    expect(screen.getByText('3/3')).toBeTruthy()
   })
 
   it('loads the roster on mount', () => {
     const { handlers } = setup(READY, 10)
     expect(handlers.load).toHaveBeenCalledTimes(1)
   })
+})
 
-  it('shows the credits pill with the persisted balance, and hides it without a service', () => {
+describe('WorkbenchDashboard right-side cards', () => {
+  it('shows the design-mock bounty balance and month remainder', () => {
+    // The hero card is a typed placeholder until its data seam lands; the
+    // real balance lives in the session-scoped Credits tab.
     setup({ ...READY, credits: 1280 }, 10)
-    expect(screen.getByText('1280')).toBeTruthy()
-    expect(screen.getByText(zh['credits.label'])).toBeTruthy()
-    cleanup()
+    expect(screen.getByText('100,000')).toBeTruthy()
+    expect(screen.getByText(/87,420/)).toBeTruthy()
+  })
 
+  it('lists presence counts, progress rows, and deliverables', () => {
     setup(READY, 10)
-    expect(screen.queryByText(zh['credits.label'])).toBeNull()
+    // online 2, busy 1, offline 1.
+    expect(screen.getByText(zh['right.team.online'])).toBeTruthy()
+    expect(screen.getByText(zh['right.deliverables.file1'])).toBeTruthy()
+    expect(screen.getByText('60%')).toBeTruthy()
   })
 })
 
@@ -121,12 +156,32 @@ describe('WorkbenchDashboard quick actions', () => {
 })
 
 describe('WorkbenchDashboard team cards', () => {
-  it('renders every member by name and starts that member on click', () => {
+  it('renders role-less presets when the deployment composes no company roles', () => {
     const { handlers } = setup(READY, 10)
     const card = screen.getByText('极简模式').closest('button')!
     expect(card).toBeTruthy()
     fireEvent.click(card)
     expect(handlers.startWithPreset).toHaveBeenCalledWith('minimal')
+  })
+
+  it('presents the four roles in design order and hides non-role presets', () => {
+    const roleState: WorkbenchState = {
+      ...READY,
+      members: [
+        member({ id: 'standard', name: '标准模式' }),
+        roleMember('audit', 'AI 审计'),
+        roleMember('secretary', 'AI 秘书'),
+        roleMember('accountant', 'AI 会计'),
+        roleMember('legal', 'AI 法务'),
+      ],
+    }
+    setup(roleState, 10)
+    expect(screen.queryByText('标准模式')).toBeNull()
+    const cards = screen.getAllByText(/^AI (秘书|会计|法务|审计)$/).map(node => node.textContent)
+    expect(cards).toEqual(['AI 秘书', 'AI 会计', 'AI 法务', 'AI 审计'])
+    // Every role card renders its capability tags.
+    expect(screen.getByText(zh['role.secretary.tag.service'])).toBeTruthy()
+    expect(screen.getByText(zh['role.audit.tag.report'])).toBeTruthy()
   })
 
   it('disables offline members so their preset cannot be started', () => {
@@ -141,6 +196,7 @@ describe('WorkbenchDashboard team cards', () => {
   it('shows the empty-team note instead of cards when no presets exist', () => {
     const empty: WorkbenchState = {
       status: 'unavailable', error: null, members: [], online: 0, busy: 0, offline: 0, credits: null,
+      ...COUNTS,
     }
     setup(empty, 10)
     expect(screen.getByText(zh['team.empty'])).toBeTruthy()

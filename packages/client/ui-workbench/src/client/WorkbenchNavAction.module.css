@@ -1,17 +1,16 @@
-/* Workbench sidebar-foot nav entries: matches the Settings trigger geometry so
-   the foot controls read as one row family. */
-
+/* Workbench sidebar navigation entries: one row per surface, stacked by the
+   shell's navigation seat under New Session. */
 .action {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  height: 42px;
+  height: 38px;
   margin: 0;
   padding: 0 10px 0 8px;
   box-sizing: border-box;
   border: none;
-  border-radius: 12px;
+  border-radius: 10px;
   background: transparent;
   cursor: pointer;
   overflow: hidden;

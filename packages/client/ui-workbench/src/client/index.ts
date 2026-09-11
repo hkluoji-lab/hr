@@ -1,16 +1,15 @@
 /**
  * Workbench plugin, browser half: the blank-session hero's
  * `conversation.hero.dashboard` entry (greeting, quick actions, team roster),
- * five additive `sidebar.footer.action` nav entries (hero, task hall, task
- * assistant, AI team, month report), and the `shell.overlay` page surface they
- * open. One controller backs all three so a nav entry and a hero shortcut
- * drive the same page state, and the right-Sidebar tabs read the same
- * snapshots. The roster arrives through one `agentPresets.list` Remote call;
- * quick actions drive the Workspace navigation service, member cards stage the
- * member's preset onto the blank session the start creates, a written
- * assignment additionally submits its brief as that session's first message,
- * and the report page reads and grants credits through the host workbench
- * Remote.
+ * five additive `sidebar.nav` entries (task hall, task assistant, active
+ * tasks, AI team, projects), and the `shell.overlay` page surface they open.
+ * One controller backs all three so a nav entry and a hero shortcut drive the
+ * same page state, and the right-Sidebar tabs read the same snapshots. The
+ * roster arrives through one `agentPresets.list` Remote call; quick actions
+ * drive the Workspace navigation service, member cards stage the member's
+ * preset onto the blank session the start creates, a written assignment
+ * additionally submits its brief as that session's first message, and the
+ * report page reads and grants credits through the host workbench Remote.
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // Type-only: pulls the Session Controller service merge (ctx.sessions).
@@ -22,6 +21,9 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: pulls the right-Sidebar tab registry merge and its tab SlotMap seat.
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
+// Type-only: pulls ui-sidebar's SlotMap merge (the two brand seats).
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import { SidebarBrandMark, SidebarBrandName } from './SidebarBrand.tsx'
 import { WorkbenchDashboard } from './WorkbenchDashboard.tsx'
 import type { WorkbenchInjected } from './WorkbenchDashboard.tsx'
 import { WorkbenchNavAction, navActionFace, type WorkbenchNavTarget } from './WorkbenchNavAction.tsx'
@@ -63,8 +65,8 @@ export const inject = [
   'sessions', 'uiWorkspace', 'layout', 'sidebarRightTabs',
 ]
 
-/** Sidebar nav entries in display order; each id is `workbench-<target>`. */
-const NAV_TARGETS: readonly WorkbenchNavTarget[] = ['home', 'hall', 'assistant', 'team', 'report']
+/** Sidebar nav entries in the design's display order; each id is `workbench-<target>`. */
+const NAV_TARGETS: readonly WorkbenchNavTarget[] = ['hall', 'assistant', 'active', 'team', 'projects']
 
 /**
  * Mount the workbench dashboard on the blank-session hero.
@@ -104,6 +106,21 @@ export function apply(ctx: ClientContext): void {
       { name: 'sidebar.right.pane.tab', key: TEAM_STATUS_ID, locale: NS, inject: teamStatusFace(controller) },
       TeamStatusTab,
     )), 'ui-workbench: team status tab body')
+  })
+
+  // Deployment branding: replace the sidebar shell's fish/generic-text brand
+  // fallbacks with the design's 星耀智 tile and wordmark (text placeholders
+  // until image assets land). The `single` slots exist in both the expanded
+  // brand row and the collapsed rail, so one registration covers both.
+  ctx.inject(['slots'], (scope: ClientContext) => {
+    scope.effect(() => scope.slots.register({
+      name: 'sidebar.brand.mark',
+      locale: NS,
+    }, SidebarBrandMark), 'ui-workbench: sidebar brand mark')
+    scope.effect(() => scope.slots.register({
+      name: 'sidebar.brand.name',
+      locale: NS,
+    }, SidebarBrandName), 'ui-workbench: sidebar brand name')
   })
 
   // The sidebar nav, the frame-wide page surface, and the hero dashboard share
@@ -161,18 +178,20 @@ export function apply(ctx: ClientContext): void {
       }
     }, 'ui-workbench: hero dashboard')
 
-    // Additive sidebar foot entries — one per workbench surface. They take the
-    // existing `sidebar.footer.action` list without replacing the sidebar shell
-    // or its workspace/settings regions.
-    for (const [order, target] of NAV_TARGETS.entries()) {
-      scope.effect(() => scope.slots.register({
-        name: 'sidebar.footer.action',
-        id: `workbench-${target}`,
-        order,
-        locale: NS,
-        inject: () => navActionFace(scope.sessions, controller, target),
-      }, WorkbenchNavAction), `ui-workbench: sidebar ${target} action`)
-    }
+    // Additive sidebar navigation entries — one per workbench surface, in the
+    // design's order. They take the `sidebar.nav` list, so the sidebar shell
+    // keeps its brand row, New Session control, and browsing region.
+    scope.effect(() => scope.slots.inject('sidebar.nav', function* () {
+      for (const [order, target] of NAV_TARGETS.entries()) {
+        yield scope.slots.register({
+          name: 'sidebar.nav',
+          id: `workbench-${target}`,
+          order,
+          locale: NS,
+          inject: () => navActionFace(controller, target),
+        }, WorkbenchNavAction)
+      }
+    }), 'ui-workbench: sidebar nav')
 
     // Frame-wide page surface: the sidebar nav opens one page at a time; a
     // closed state renders nothing, keeping the overlay layer click-through.

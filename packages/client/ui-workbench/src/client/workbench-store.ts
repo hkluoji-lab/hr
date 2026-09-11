@@ -31,6 +31,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { WorkbenchCreditEntry } from '@deepseek-ai/dsh-workbench/types'
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
+import { roleOf, type RoleMeta } from './roles.ts'
 
 /** A team member's live state, mirroring the roster vs live sessions. */
 export type TeamMemberState = 'online' | 'busy' | 'offline'
@@ -59,6 +60,8 @@ export interface TeamMember {
   description: string
   /** Live state derived from the roster and the session list. */
   state: TeamMemberState
+  /** Role presentation (emoji, scope, tags), for the four company presets. */
+  role: RoleMeta | undefined
 }
 
 /** Workbench dashboard snapshot. */
@@ -77,6 +80,12 @@ export interface WorkbenchState {
   offline: number
   /** Persisted credits balance, or null when the host composes no workbench service. */
   credits: number | null
+  /** Tasks (started, non-blank sessions) updated since local midnight. */
+  todayCount: number
+  /** Tasks currently running. */
+  runningCount: number
+  /** Tasks the host marked finished, all time. */
+  doneCount: number
 }
 
 const INITIAL: WorkbenchState = {
@@ -87,10 +96,13 @@ const INITIAL: WorkbenchState = {
   busy: 0,
   offline: 0,
   credits: null,
+  todayCount: 0,
+  runningCount: 0,
+  doneCount: 0,
 }
 
 /** A workbench page the sidebar surfaces as a frame-wide overlay. */
-export type WorkbenchPageId = 'hall' | 'assistant' | 'team' | 'report'
+export type WorkbenchPageId = 'hall' | 'assistant' | 'active' | 'team' | 'report'
 
 /** Which workbench page, if any, covers the app frame. */
 export interface WorkbenchPagesState {
@@ -200,6 +212,33 @@ export function monthReport(
   }
 }
 
+/** Hero stat counters folded from the Session list. */
+export interface TaskCounts {
+  /** Tasks updated since local midnight. */
+  today: number
+  /** Tasks currently running. */
+  running: number
+  /** Tasks the host marked finished, all time. */
+  done: number
+}
+
+/**
+ * Fold the Session list into the hero's task counters.
+ * @param snapshot - the Session list snapshot.
+ * @param now - the reference instant, epoch milliseconds.
+ * @returns today's, running, and finished task counts.
+ */
+export function taskCounts(snapshot: SessionListState, now: number = Date.now()): TaskCounts {
+  const rows = taskRows(snapshot)
+  const start = new Date(now)
+  start.setHours(0, 0, 0, 0)
+  return {
+    today: rows.filter(row => row.updatedAt >= start.getTime()).length,
+    running: rows.filter(row => row.status === 'running').length,
+    done: rows.filter(row => row.status === 'done').length,
+  }
+}
+
 /**
  * Read the agent-preset roster, turning the optional-service absence into an
  * empty roster the same way the preset surfaces do.
@@ -279,21 +318,27 @@ export class WorkbenchController {
       this.set({ status: 'error', error: roster.error })
       return
     }
+    const counts = taskCounts(this.ctx.sessions.list.getSnapshot())
     const presets = roster.value.presets
     if (presets.length === 0) {
-      this.set({ status: 'unavailable', members: [], online: 0, busy: 0, offline: 0, credits })
+      this.set({
+        status: 'unavailable', members: [], online: 0, busy: 0, offline: 0, credits,
+        todayCount: counts.today, runningCount: counts.running, doneCount: counts.done,
+      })
       return
     }
     const busy = busyPresetIds(this.ctx)
     const members: TeamMember[] = presets.map((preset) => {
+      const name = preset.name ?? preset.id
       const state: TeamMemberState = preset.broken !== undefined
         ? 'offline'
         : busy.has(preset.id) ? 'busy' : 'online'
       return {
         id: preset.id,
-        name: preset.name ?? preset.id,
+        name,
         description: preset.description ?? '',
         state,
+        role: roleOf(name),
       }
     })
     // Healthy members first, broken (offline) ones sink to the end.
@@ -309,6 +354,9 @@ export class WorkbenchController {
       online: members.filter(member => member.state === 'online').length,
       busy: members.filter(member => member.state === 'busy').length,
       offline: members.filter(member => member.state === 'offline').length,
+      todayCount: counts.today,
+      runningCount: counts.running,
+      doneCount: counts.done,
     })
   }
 

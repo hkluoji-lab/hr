@@ -199,6 +199,12 @@ export function SidebarRoot({
         </button>
       </Tooltip>
 
+      {/* Primary navigation sits directly under New Session in both states;
+          its rail column rides the same slot. */}
+      <div className={css.navArea}>
+        {renderSlot('sidebar.nav', { wide })}
+      </div>
+
       {/* The browsing region fills the column between the controls and the
           foot in both states; its rail icon column rides the same slot. */}
       <div className={css.regionArea}>

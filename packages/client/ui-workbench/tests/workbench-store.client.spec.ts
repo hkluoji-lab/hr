@@ -7,13 +7,15 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentPresetRoster } from '@deepseek-ai/dsh-agent-presets/types'
-import { WorkbenchController, memberDotState } from '../src/client/workbench-store.ts'
+import { WorkbenchController, memberDotState, taskCounts } from '../src/client/workbench-store.ts'
 
 afterEach(() => { vi.restoreAllMocks() })
 
 /** Mutable session-list state the controller reads and subscribes to. */
 interface ListState {
   current: string | undefined
+  /** List order; defaults to every key in byId when a bench omits it. */
+  ids?: string[]
   byId: Record<string, {
     id: string
     blank: boolean
@@ -67,7 +69,7 @@ function makeCtx(
     },
     sessions: {
       list: {
-        getSnapshot: () => state,
+        getSnapshot: () => ({ ids: state.ids ?? Object.keys(state.byId), ...state }),
         subscribe: (fn: () => void) => {
           listeners.add(fn)
           return () => listeners.delete(fn)
@@ -127,6 +129,23 @@ describe('WorkbenchController roster derivation', () => {
     const members = controller.store.getSnapshot().members
     expect(members[0]).toMatchObject({ id: 'standard', name: '标准模式', description: '完整工具集' })
     expect(members[1]).toMatchObject({ id: 'bare', name: 'bare', description: '' })
+  })
+
+  it('tags company presets with their role and leaves other presets role-less', async () => {
+    const bench = makeCtx({
+      ok: true,
+      value: roster([
+        { id: 'sec', trust: 'system', isDefault: false, name: 'AI 秘书' },
+        { id: 'standard', trust: 'system', isDefault: true, name: '标准模式' },
+      ]),
+    }, { current: undefined, byId: {} })
+
+    const controller = new WorkbenchController(bench.ctx as never)
+    await controller.load()
+    const byId = Object.fromEntries(
+      controller.store.getSnapshot().members.map(member => [member.id, member.role?.id]))
+
+    expect(byId).toEqual({ sec: 'secretary', standard: undefined })
   })
 
   it('marks a preset busy when a live non-blank session runs it', async () => {
@@ -270,6 +289,38 @@ describe('memberDotState', () => {
     expect(memberDotState('online')).toBe('done')
     expect(memberDotState('busy')).toBe('ongoing')
     expect(memberDotState('offline')).toBe('idle')
+  })
+})
+
+describe('taskCounts', () => {
+  /** Build one session row the fold reads; non-blank user sessions by default. */
+  function taskSession(over: Partial<{
+    blank: boolean
+    origin: string
+    running: boolean
+    completed: boolean
+  }> & { id: string; updatedAt: number }) {
+    return {
+      displayTitle: over.id, projectionValues: {}, blank: false, origin: 'user',
+      running: false, completed: false, ...over,
+    }
+  }
+
+  it('counts since local midnight and folds lifecycle states, skipping blank and subagent rows', () => {
+    const today = new Date(2026, 8, 10, 9, 0, 0).getTime()
+    const yesterday = new Date(2026, 8, 9, 10, 0, 0).getTime()
+    const now = new Date(2026, 8, 10, 15, 0, 0).getTime()
+    const snapshot = {
+      ids: ['running', 'doneToday', 'doneYesterday', 'blank', 'subagent'],
+      byId: {
+        running: taskSession({ id: 'running', updatedAt: today, running: true }),
+        doneToday: taskSession({ id: 'doneToday', updatedAt: today, completed: true }),
+        doneYesterday: taskSession({ id: 'doneYesterday', updatedAt: yesterday, completed: true }),
+        blank: taskSession({ id: 'blank', updatedAt: today, blank: true, completed: true }),
+        subagent: taskSession({ id: 'subagent', updatedAt: today, origin: 'subagent', completed: true }),
+      },
+    }
+    expect(taskCounts(snapshot as never, now)).toEqual({ today: 2, running: 1, done: 2 })
   })
 })
 

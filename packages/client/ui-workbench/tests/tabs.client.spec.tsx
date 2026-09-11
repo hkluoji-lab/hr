@@ -153,13 +153,14 @@ describe('ProgressTab', () => {
 })
 
 const MEMBERS: readonly TeamMember[] = [
-  { id: 'standard', name: '标准模式', description: '', state: 'online' },
-  { id: 'minimal', name: '极简模式', description: '', state: 'busy' },
-  { id: 'broken', name: '失效预设', description: '', state: 'offline' },
+  { id: 'standard', name: '标准模式', description: '', state: 'online', role: undefined },
+  { id: 'minimal', name: '极简模式', description: '', state: 'busy', role: undefined },
+  { id: 'broken', name: '失效预设', description: '', state: 'offline', role: undefined },
 ]
 
 const READY: WorkbenchState = {
   status: 'ready', error: null, members: MEMBERS, online: 1, busy: 1, offline: 1, credits: 1280,
+  todayCount: 2, runningCount: 1, doneCount: 0,
 }
 
 describe('CreditsTab', () => {

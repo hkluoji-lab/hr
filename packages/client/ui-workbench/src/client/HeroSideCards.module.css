@@ -1,0 +1,215 @@
+/* The blank-session hero's right-side card stack. The frame mounts the right
+   column only for an open session, so on the hero the stack floats over the
+   centre column's right gutter; narrow viewports hide it entirely. */
+
+.root {
+  display: none;
+}
+
+@media (min-width: 1300px) {
+  .root {
+    position: fixed;
+    top: 12px;
+    right: 14px;
+    bottom: 112px;
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 288px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    pointer-events: auto;
+  }
+}
+
+.card,
+.creditsCard {
+  flex: none;
+  padding: 15px 18px 16px;
+  border: 1px solid #f3e9f2;
+  border-radius: 15px;
+  background: #ffffff;
+  color: #2e2432;
+}
+
+.creditsCard {
+  padding: 16px 18px 18px;
+  border-color: #f8e3ee;
+  background: linear-gradient(150deg, #fdf1f7 0%, #fceff6 100%);
+}
+
+.cardHead,
+.creditsHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cardTitle {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #7c7280;
+  letter-spacing: 0.01em;
+}
+
+.minus {
+  color: #c9bfca;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.chevron {
+  color: #c3b9c4;
+}
+
+.balanceValue {
+  margin-top: 10px;
+  font-size: 35px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: #2e2432;
+  font-variant-numeric: tabular-nums;
+}
+
+.creditsSub {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #a098a6;
+}
+
+.dotSep {
+  color: #cfc6d0;
+}
+
+.statusList {
+  margin: 12px 0 2px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.statusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.online {
+  background: #34b96d;
+}
+
+.busy {
+  background: #e09a35;
+}
+
+.offline {
+  background: #b3b7c2;
+}
+
+.statusLabel {
+  flex: 1 1 auto;
+  font-size: 13.5px;
+  color: #6b6170;
+}
+
+.statusCount {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2e2432;
+  font-variant-numeric: tabular-nums;
+}
+
+.progressList {
+  margin-top: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.progressLine {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.progressLabel {
+  font-size: 13px;
+  color: #4a4250;
+}
+
+.progressValue {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #2e2432;
+  font-variant-numeric: tabular-nums;
+}
+
+.progressTrack {
+  height: 4px;
+  border-radius: 99px;
+  background: #f2edf4;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #e9639f 0%, #c07fd6 100%);
+}
+
+.fileList {
+  margin: 12px 0 2px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fileRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: #faf7fb;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.fileRow:hover {
+  background: #f4edf7;
+}
+
+.fileName {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12.5px;
+  color: #514a57;
+  text-align: left;
+}
+
+.fileIcon {
+  flex: none;
+  color: #b2a9bb;
+}

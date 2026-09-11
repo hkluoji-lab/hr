@@ -1,5 +1,5 @@
 ---
-description: "Web 工作台各表面：空白会话 hero 仪表盘（问候、快捷动作、积分、Agent 预设团队名册）、打开全帧任务大厅/智能任务助手/AI 团队/本月报告页面的五个侧栏底部导航入口，以及右栏中会话作用域的交付物、子任务进度、赏金额度与 AI 团队状态 tab；供工作台各表面的用户与维护者阅读。"
+description: "Web 工作台各表面：空白会话 hero 仪表盘（问候、快捷动作、积分、Agent 预设团队名册）、打开全帧页面的五个侧栏导航入口（任务大厅、智能任务助手、活跃任务、AI 团队、项目），以及右栏中会话作用域的交付物、子任务进度、赏金额度与 AI 团队状态 tab；供工作台各表面的用户与维护者阅读。"
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-本包渲染 Web GUI 上的工作台：空白会话 hero 仪表盘（按时间变化的问候语、在线团队副标题、四张快捷动作卡、Agent 预设团队成员卡），以及五个侧栏底部导航入口：工作台、任务大厅、智能任务助手、AI 团队、本月报告。名册数据来自一次 `agentPresets.list` Remote 读取，成员分为「工作中」「在线」「离线」；成员卡把其预设 staged 到新会话。导航入口在 `shell.overlay` 中打开全帧页面：跨会话任务行、把任务指派给成员的描述表单、团队网格，以及带积分余额、发放表单与明细的本月报告。会话作用域的右栏 tab 提供交付物、进度、赏金额度与 AI 团队状态。
+本包渲染 Web GUI 上的工作台：空白会话 hero 仪表盘（问候语、在线团队副标题、四个快捷动作、Agent 预设团队成员卡），以及产品主导航——五个 `sidebar.nav` 入口：任务大厅、智能任务助手、活跃任务、AI 团队、项目。名册数据来自一次 `agentPresets.list` Remote 读取（工作中、在线、离线），成员卡把其预设 staged 到新会话。四个入口在 `shell.overlay` 中打开全帧页面——跨会话任务行、描述表单、运行中任务过滤、团队网格——项目则展开工作区浏览器。会话作用域的右栏 tab 提供交付物、进度、赏金额度与 AI 团队状态。
 
 ## 目录
 
@@ -27,7 +27,7 @@ kind: "package-reference"
 
 与运行时一起挂载本插件；没有当前会话时，hero 会在标题区与工作区行之间显示仪表盘。「新建任务」以部署默认组合开启新会话，「查看项目」展开侧栏的工作区浏览器，每张团队成员卡则以该成员的预设组合开启会话。损坏的预设渲染为离线且不可点击。宿主 workbench 服务存在时，副标题显示积分余额。
 
-侧栏底部新增五个入口，不替换任何侧栏区域；宽栏下渲染为带文字的行，rail 折叠态下渲染为 36px 圆形图标并带 Tooltip。**工作台**清除当前会话回到 hero；其余四个打开覆盖应用整帧的页面，再次点击当前项（或页面的关闭控件，或 Escape）即关闭。**任务大厅**列出全部已启动会话——标题、运行它的预设、生命周期与最近更新时间——点击行即选中该会话。**智能任务助手**是任务描述表单：写下任务、可选地指派一名成员（或留给默认团队），提交后开启该会话并把描述作为它的首条用户消息。**AI 团队**以页面尺度渲染预设名册，点击卡片以该成员的预设开启会话。**本月报告**并列展示本自然月的任务统计、积分余额、发放表单与最近明细。
+侧栏主导航在新会话按钮正下方新增五个入口，不替换任何侧栏区域；宽栏下渲染为带文字的行，rail 折叠态下渲染为 36px 带 Tooltip 的控件。**任务大厅**列出全部已启动会话——标题、运行它的预设、生命周期与最近更新时间——点击行即选中该会话。**智能任务助手**是任务描述表单：写下任务、可选地指派一名成员（或留给默认团队），提交后开启该会话并把描述作为它的首条用户消息。**活跃任务**是只保留运行中会话的大厅。**AI 团队**以页面尺度渲染预设名册，点击卡片以该成员的预设开启会话。**项目**展开工作区浏览器。前四项打开覆盖应用整帧的页面，再次点击当前项（或页面的关闭控件，或 Escape）即关闭。**本月报告**从 hero 的快捷动作打开，并列展示本自然月的任务统计、积分余额、发放表单与最近明细。
 
 hero 上的「调用 AI 团队」与「本月报告」会打开同样的团队页与报告页。
 
@@ -47,7 +47,7 @@ hero 上的「调用 AI 团队」与「本月报告」会打开同样的团队�
 
 单个 `WorkbenchController` 支撑全部表面，因此导航入口与 hero 快捷方式驱动同一份页面状态。它持有三个快照 store：团队/积分仪表盘、当前打开页面的 id、积分明细。`load()` 发一次 `agentPresets.list`（与其他预设表面一样把 `gateway/invocation-unavailable` 视为空名册），折叠会话列表把有非空白会话的预设标记为「工作中」，损坏预设排到末尾作为「离线」。`startWithPreset(id)` 复刻 hero 预设芯片：先 stage id，调用 `uiWorkspace.startSession()`，下一次会话列表变化时对新的空白会话应用 `agentPresets.select`——宿主拒绝为非空白会话换组合。`assignTask(presetId, brief)` 走同一次开启流程，并在绑定出现后把描述作为该会话的首条用户消息提交。
 
-hero 向 `conversation.hero.dashboard` 列表槽位（由 ui-conversation 声明，scope 为 `root`）贡献一个条目。五个条目占用既有的 `sidebar.footer.action` 列表槽位（由 ui-sidebar 声明，scope 为 `root`），因此无需改动侧栏外壳代码：`navActionFace(sessions, controller, target)` 把 `home` 绑为 `sessions.clear()` 加关闭页面，把页面目标绑为 `controller.togglePage`，并从打开页面 store 与会话列表快照共同派生活动态。页面表面是 `shell.overlay` 列表槽位（由 ui-layout 声明，scope 为 `root`）中的一个条目；`WorkbenchShell` 在没有页面打开时渲染 null，保持 overlay 层可点击穿透，并分发到大厅、助手、团队或报告页。大厅折叠会话列表（跳过空白与子任务会话），其 hook 按列表快照缓存，使 `useSyncExternalStore` 始终看到稳定引用。
+hero 向 `conversation.hero.dashboard` 列表槽位（由 ui-conversation 声明，scope 为 `root`）贡献一个条目。五个条目占用 `sidebar.nav` 列表槽位（由 ui-sidebar 声明，scope 为 `root`），因此无需改动侧栏外壳代码：`navActionFace(controller, target)` 把页面目标绑为 `controller.togglePage` 并从打开页面 store 派生活动态，把项目绑为 `controller.viewProjects()`，即展开侧栏工作区浏览器。页面表面是 `shell.overlay` 列表槽位（由 ui-layout 声明，scope 为 `root`）中的一个条目；`WorkbenchShell` 在没有页面打开时渲染 null，保持 overlay 层可点击穿透，并分发到大厅、助手、活跃任务、团队或报告页。大厅折叠会话列表（跳过空白与子任务会话），其 hook 按列表快照缓存，使 `useSyncExternalStore` 始终看到稳定引用。
 
 报告页通过宿主 workbench 的 `ledger` Remote 读取有界明细，通过 `addCredits` 发放，并以宿主自身的返回刷新余额与明细。`monthReport` 用同一批大厅行与明细条目统计本地自然月。
 
@@ -65,7 +65,7 @@ hero 向 `conversation.hero.dashboard` 列表槽位（由 ui-conversation 声明
 - [ui-agent-preset](../ui-agent-preset/README.zh.md)——共享同一名册的预设管理设置区与 hero 预设芯片。
 - [ui-workspace](../ui-workspace/README.zh.md)——快捷动作所驱动的 Workspace 导航服务（`startSession`）。
 - [ui-conversation](../ui-conversation/README.zh.md)——声明本包占用的 `conversation.hero.dashboard` 槽位。
-- [ui-sidebar](../ui-sidebar/README.zh.md)——声明导航入口占用的 `sidebar.footer.action` 列表槽位。
+- [ui-sidebar](../ui-sidebar/README.zh.md)——声明主导航入口占用的 `sidebar.nav` 列表槽位。
 - [ui-layout](../ui-layout/README.zh.md)——声明全帧页面占用的 `shell.overlay` 列表槽位。
 - [ui-sidebar-right](../ui-sidebar-right/README.zh.md)——拥有 tab 注册表与四个 tab 占用的 keyed `sidebar.right.pane.tab` 槽位。
 - [ui-deliverables](../ui-deliverables/README.zh.md)——拥有产出文件词表，交付物 tab 通过其 `sessionDeliverables` 服务调用。

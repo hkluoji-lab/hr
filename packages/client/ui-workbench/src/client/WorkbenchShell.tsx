@@ -1,9 +1,9 @@
 /**
  * The workbench page surface: one `shell.overlay` entry rendering whichever
- * page the sidebar nav opened — the task hall, the task assistant, the AI
- * team, or the month report — over the whole frame. Closed state renders null,
- * so the overlay layer stays click-through until a page is open. Escape and
- * the header's close control both dismiss.
+ * page the sidebar nav opened — the task hall, the task assistant, the active
+ * tasks, the AI team, or the month report — over the whole frame. Closed state
+ * renders null, so the overlay layer stays click-through until a page is open.
+ * Escape and the header's close control both dismiss.
  */
 import { useEffect, useSyncExternalStore } from 'react'
 import { IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -34,6 +34,7 @@ import css from './WorkbenchShell.module.css'
 const TITLES: Record<WorkbenchPageId, WorkbenchKey> = {
   hall: 'nav.hall',
   assistant: 'nav.assistant',
+  active: 'nav.active',
   team: 'nav.team',
   report: 'nav.report',
 }
@@ -42,6 +43,7 @@ const TITLES: Record<WorkbenchPageId, WorkbenchKey> = {
 const SUBTITLES: Record<WorkbenchPageId, WorkbenchKey> = {
   hall: 'hall.subtitle',
   assistant: 'assistant.subtitle',
+  active: 'active.subtitle',
   team: 'team.subtitle',
   report: 'report.subtitle',
 }
@@ -147,6 +149,16 @@ export function WorkbenchShell({
       <div className={css.body}>
         {open === 'hall' && (
           <TaskHallPage tasks={tasks} members={team.members} now={now} onOpen={openSession} t={t} />
+        )}
+        {open === 'active' && (
+          <TaskHallPage
+            tasks={tasks.filter(task => task.status === 'running')}
+            members={team.members}
+            now={now}
+            onOpen={openSession}
+            emptyKey="active.empty"
+            t={t}
+          />
         )}
         {open === 'assistant' && (
           <AssistantPage state={team} onAssign={assignTask} t={t} />

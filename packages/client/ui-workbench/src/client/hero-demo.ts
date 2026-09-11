@@ -1,0 +1,35 @@
+/**
+ * Placeholder content for the hero's right-side cards. The bounty balance
+ * falls back to the host credits service when a deployment composes one;
+ * progress rows and deliverable files have no backing service yet, so they
+ * reproduce the design mock as typed placeholders pending that data seam.
+ */
+import type { WorkbenchKey } from './locales.ts'
+
+/** Bounty card fallback: 100,000 available points. */
+export const DEMO_CREDITS_BALANCE = 100000
+
+/** Bounty card fallback: 87,420 points left this month. */
+export const DEMO_CREDITS_MONTH_LEFT = 87420
+
+/** One progress bar placeholder. */
+export interface DemoProgress {
+  /** Locale key of the flow name. */
+  readonly labelKey: WorkbenchKey
+  /** Completion percent, 0-100. */
+  readonly percent: number
+}
+
+/** The three progress rows in design order. */
+export const DEMO_PROGRESS: readonly DemoProgress[] = [
+  { labelKey: 'right.progress.secretary', percent: 60 },
+  { labelKey: 'right.progress.finance', percent: 30 },
+  { labelKey: 'right.progress.legal', percent: 90 },
+]
+
+/** Deliverable file-name locale keys in design order. */
+export const DEMO_DELIVERABLE_KEYS: readonly WorkbenchKey[] = [
+  'right.deliverables.file1',
+  'right.deliverables.file2',
+  'right.deliverables.file3',
+]
