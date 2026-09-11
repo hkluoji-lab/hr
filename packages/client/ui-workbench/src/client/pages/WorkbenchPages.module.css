@@ -200,7 +200,8 @@
   border-color: var(--dsh-accent, #b478e8);
 }
 
-.memberChip[aria-pressed='true'] {
+.memberChip[aria-pressed='true'],
+.memberChip[aria-checked='true'] {
   border-color: var(--dsh-accent, #b478e8);
   color: var(--dsh-accent, #9a5cd6);
   background: var(--dsh-accent-soft, #f3eafd);

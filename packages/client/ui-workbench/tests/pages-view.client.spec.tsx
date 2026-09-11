@@ -197,6 +197,66 @@ describe('AssistantPage', () => {
     // The default-team chip stays first regardless of the roster.
     expect(screen.getByRole('button', { name: zh['hall.defaultTeam'] })).toBeTruthy()
   })
+
+  it('keeps the picker visible and the switch enabled while the deployment composes the roles', () => {
+    const roster: readonly TeamMember[] = [
+      { id: 'standard', name: '标准模式', description: '', state: 'online', role: undefined },
+      { id: 'secretary', name: 'AI 秘书', description: '', state: 'online', role: ROLES[0] },
+    ]
+    render(<AssistantPage state={{ ...READY, members: roster }} onAssign={vi.fn()} t={assistantT} />)
+    const collaboration = screen.getByRole('switch', { name: zh['assistant.collaboration'] })
+    expect(collaboration.getAttribute('aria-checked')).toBe('false')
+    expect((collaboration as HTMLButtonElement).disabled).toBe(false)
+    expect(screen.getByText(zh['assistant.member'])).toBeTruthy()
+  })
+
+  it('hides the picker in collaboration mode and submits the orchestration brief to the secretary', () => {
+    const roster: readonly TeamMember[] = [
+      { id: 'standard', name: '标准模式', description: '', state: 'online', role: undefined },
+      { id: 'secretary', name: 'AI 秘书', description: '', state: 'online', role: ROLES[0] },
+    ]
+    const onAssign = vi.fn()
+    render(<AssistantPage state={{ ...READY, members: roster }} onAssign={onAssign} t={assistantT} />)
+
+    fireEvent.click(screen.getByRole('switch', { name: zh['assistant.collaboration'] }))
+    expect(screen.queryByText(zh['assistant.member'])).toBeNull()
+    expect(screen.queryByRole('button', { name: zh['hall.defaultTeam'] })).toBeNull()
+    expect(screen.getByText(zh['assistant.collaborationHint'])).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText(zh['assistant.brief']), { target: { value: '季度结算并检查合同' } })
+    fireEvent.click(submit())
+    expect(onAssign).toHaveBeenCalledTimes(1)
+    const [presetId, brief] = onAssign.mock.calls[0] as [string | undefined, string]
+    expect(presetId).toBe('secretary')
+    expect(brief).toContain('季度结算并检查合同')
+    expect(brief).toContain('workflow')
+    expect(brief).toContain('parallel')
+    expect(brief).not.toContain('{brief}')
+  })
+
+  it('falls back to manual assignment after the switch turns off again', () => {
+    const onAssign = vi.fn()
+    render(<AssistantPage state={READY} onAssign={onAssign} t={assistantT} />)
+
+    const collaboration = screen.getByRole('switch', { name: zh['assistant.collaboration'] })
+    fireEvent.click(collaboration)
+    fireEvent.click(collaboration)
+    expect(screen.getByText(zh['assistant.member'])).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText(zh['assistant.brief']), { target: { value: '写一份周报' } })
+    fireEvent.click(submit())
+    expect(onAssign).toHaveBeenCalledWith(undefined, '写一份周报')
+  })
+
+  it('disables the switch when the deployment ships no secretary role', () => {
+    const roster: readonly TeamMember[] = [
+      { id: 'standard', name: '标准模式', description: '', state: 'online', role: undefined },
+    ]
+    render(<AssistantPage state={{ ...READY, members: roster }} onAssign={vi.fn()} t={assistantT} />)
+
+    const collaboration = screen.getByRole('switch', { name: zh['assistant.collaboration'] }) as HTMLButtonElement
+    expect(collaboration.disabled).toBe(true)
+  })
 })
 
 describe('ReportPage', () => {
