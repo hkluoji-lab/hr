@@ -75,12 +75,11 @@ export function WorkbenchNavAction({ wide, t, target, useActive, activate, openT
   const label = t(TARGETS[target].label)
   const Icon = TARGETS[target].icon
 
-  // Expansion is this row's presentation state, not page state; the group and
-  // every role ship open so the full company team is visible at a glance.
-  const [groupOpen, setGroupOpen] = useState(true)
-  const [rolesOpen, setRolesOpen] = useState<ReadonlySet<RoleMeta['id']>>(
-    () => new Set(ROLES.map(role => role.id)),
-  )
+  // Expansion is this row's presentation state, not page state; everything
+  // ships collapsed so the seat stays short enough to reach the sidebar's
+  // settings footer without scrolling, and each chevron reveals on demand.
+  const [groupOpen, setGroupOpen] = useState(false)
+  const [rolesOpen, setRolesOpen] = useState<ReadonlySet<RoleMeta['id']>>(() => new Set())
 
   const button = (
     <button

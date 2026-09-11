@@ -14,7 +14,7 @@ Status: implemented
 
 `ui-workbench` 按设计顺序注册五个入口，每个表面一个，id 为 `workbench-<target>`，`order` 等于其下标。每个入口通过 `navActionFace(controller, target)` 自行拥有目标与激活外观：页面目标切换 `controller.togglePage`，并在打开页面 store 指向该页面时报告为当前；项目目标调用 `controller.viewProjects()` 且永不报告为当前，因为它展开侧栏而非打开页面。入口组件在 `wide` 下渲染为带文字的行，在轨道上渲染为纯图标控件；侧边栏外壳的轨道入场动画包含该座位。
 
-AI 团队条目在其自身内部渲染设计中的角色组：来自共享 `ROLES` 表的四个可展开角色（AI 秘书、AI 会计、AI 法务、AI 审计），全部默认展开，每个角色列出其能力子项（AI-客服、AI-合同……），子项经 face 的 `openTeam` 打开团队页。这些子项是组件输出而非槽位条目——该座位保持为扁平的五条目列表，部署替换该入口时其角色组随之一起被替换。
+AI 团队条目在其自身内部渲染设计中的角色组：来自共享 `ROLES` 表的四个可展开角色（AI 秘书、AI 会计、AI 法务、AI 审计），默认全部折叠，使导航座位保持足够矮、无需滚动即可到达侧栏设置项（导航座位自身的溢出优先内部滚动），每个角色按需展开其能力子项（AI-客服、AI-合同……），子项经 face 的 `openTeam` 打开团队页。这些子项是组件输出而非槽位条目——该座位保持为扁平的五条目列表，部署替换该入口时其角色组随之一起被替换。
 
 ## Alternatives considered
 
@@ -35,4 +35,4 @@ AI 团队条目在其自身内部渲染设计中的角色组：来自共享 `ROL
 
 ## Verification
 
-`packages/client/ui-sidebar` 固定该座位：`apply.client.spec.tsx` 断言 `sidebar.nav` 的 spec 为 `{ kind: 'list', scope: 'root' }` 并在 teardown 时释放，`sidebar-root.client.spec.tsx` 断言该座位紧接新会话之后渲染并收到 `wide`，侧边栏快照 spec 固定展开态与轨道态两者的标记。`packages/client/ui-workbench` 固定各入口：`nav-action.client.spec.tsx` 覆盖宽栏标签与激活、`aria-current` 标记、纯图标轨道按钮、团队条目的角色组（秘书子项默认展开、逐角色切换、能力子项调用 `openTeam`、分组折叠钮），以及各 face（页面目标切换打开页面，项目命令展开侧栏，`openTeam` 打开团队页且不切换关闭）；`browser-plugin.client.spec.ts` 断言五个入口 id 按设计顺序注册并在 fiber teardown 时释放；`pages-view.client.spec.tsx` 覆盖活跃任务过滤与其空闲空状态提示。以上套件均无需密钥。
+`packages/client/ui-sidebar` 固定该座位：`apply.client.spec.tsx` 断言 `sidebar.nav` 的 spec 为 `{ kind: 'list', scope: 'root' }` 并在 teardown 时释放，`sidebar-root.client.spec.tsx` 断言该座位紧接新会话之后渲染并收到 `wide`，侧边栏快照 spec 固定展开态与轨道态两者的标记。`packages/client/ui-workbench` 固定各入口：`nav-action.client.spec.tsx` 覆盖宽栏标签与激活、`aria-current` 标记、纯图标轨道按钮、团队条目的角色组（默认全折叠、逐角色切换、能力子项调用 `openTeam`、分组折叠钮），以及各 face（页面目标切换打开页面，项目命令展开侧栏，`openTeam` 打开团队页且不切换关闭）；`browser-plugin.client.spec.ts` 断言五个入口 id 按设计顺序注册并在 fiber teardown 时释放；`pages-view.client.spec.tsx` 覆盖活跃任务过滤与其空闲空状态提示。以上套件均无需密钥。

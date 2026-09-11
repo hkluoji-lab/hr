@@ -298,13 +298,16 @@
 }
 
 /* Primary navigation seat: registrant-owned entries stack vertically under
-   New Session, above the browsing region. The rail centers the same entries
-   as its 36px controls. */
+   New Session, above the browsing region. Long registrant content (expanded
+   role groups) shrinks the seat and scrolls inside it before the browsing
+   region or the settings footer can leave the viewport. */
 .navArea {
-  flex: none;
+  flex: 0 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   margin-bottom: 4px;
+  overflow-y: auto;
 }
 
 .collapsed .navArea {

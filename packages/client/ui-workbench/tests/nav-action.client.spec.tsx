@@ -57,50 +57,47 @@ describe('WorkbenchNavAction', () => {
     expect(activate).toHaveBeenCalledTimes(1)
   })
 
-  it('the team entry renders the four role groups, all open with their children', () => {
+  it('the team entry ships fully collapsed: no role rows until the chevron opens', () => {
     render(<WorkbenchNavAction {...props({ target: 'team' })} />)
-    for (const key of ['nav.role.secretary', 'nav.role.accountant', 'nav.role.legal', 'nav.role.audit'] as const) {
-      expect(screen.getByRole('button', { name: zh[key] }).getAttribute('aria-expanded')).toBe('true')
-    }
-    for (const key of ['role.secretary.tag.service', 'role.secretary.tag.contract', 'role.secretary.tag.chase', 'role.secretary.tag.archive'] as const) {
-      expect(screen.getByRole('button', { name: `AI-${zh[key]}` })).toBeTruthy()
-    }
-    // The other roles' capability children are mounted open too.
-    for (const key of ['role.accountant.tag.books', 'role.legal.tag.charter', 'role.audit.tag.tick'] as const) {
-      expect(screen.getByRole('button', { name: `AI-${zh[key]}` })).toBeTruthy()
-    }
+    const toggle = screen.getByRole('button', { name: zh['nav.team.toggle'] })
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByRole('button', { name: zh['nav.role.secretary'] })).toBeNull()
   })
 
   it('a role row toggles its capability children', () => {
     render(<WorkbenchNavAction {...props({ target: 'team' })} />)
+    fireEvent.click(screen.getByRole('button', { name: zh['nav.team.toggle'] }))
     const accountant = screen.getByRole('button', { name: zh['nav.role.accountant'] })
-    expect(screen.getByRole('button', { name: `AI-${zh['role.accountant.tag.books']}` })).toBeTruthy()
-
-    fireEvent.click(accountant)
     expect(screen.queryByRole('button', { name: `AI-${zh['role.accountant.tag.books']}` })).toBeNull()
 
     fireEvent.click(accountant)
     expect(screen.getByRole('button', { name: `AI-${zh['role.accountant.tag.books']}` })).toBeTruthy()
+
+    fireEvent.click(accountant)
+    expect(screen.queryByRole('button', { name: `AI-${zh['role.accountant.tag.books']}` })).toBeNull()
   })
 
   it('a capability child opens the team page through openTeam', () => {
     const openTeam = vi.fn()
     render(<WorkbenchNavAction {...props({ target: 'team', openTeam })} />)
+    fireEvent.click(screen.getByRole('button', { name: zh['nav.team.toggle'] }))
+    fireEvent.click(screen.getByRole('button', { name: zh['nav.role.secretary'] }))
     fireEvent.click(screen.getByRole('button', { name: `AI-${zh['role.secretary.tag.service']}` }))
     expect(openTeam).toHaveBeenCalledTimes(1)
   })
 
-  it('the team chevron collapses and reopens the role groups', () => {
+  it('the team chevron reveals and collapses the role groups', () => {
     render(<WorkbenchNavAction {...props({ target: 'team' })} />)
     const toggle = screen.getByRole('button', { name: zh['nav.team.toggle'] })
-    expect(toggle.getAttribute('aria-expanded')).toBe('true')
-
-    fireEvent.click(toggle)
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
     expect(screen.queryByRole('button', { name: zh['nav.role.secretary'] })).toBeNull()
 
     fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
     expect(screen.getByRole('button', { name: zh['nav.role.secretary'] })).toBeTruthy()
+
+    fireEvent.click(toggle)
+    expect(screen.queryByRole('button', { name: zh['nav.role.secretary'] })).toBeNull()
   })
 })
 
