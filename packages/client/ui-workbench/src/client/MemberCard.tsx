@@ -40,7 +40,12 @@ export function MemberCard({ member, onStart, t }: MemberCardProps) {
         <span className={css.icon}>
           {role ? role.emoji : <IconAgentPresetOutline16 size={18} />}
         </span>
-        <StateDot state={memberDotState(member.state)} className={css.dot} />
+        {/* The ongoing dot matrix reads as a drag affordance at this size, so
+            busy presence is a labelled chip; the shared dot keeps the other
+            states. */}
+        {member.state === 'busy'
+          ? <span className={css.busy}>{t('status.busy')}</span>
+          : <StateDot state={memberDotState(member.state)} className={css.dot} />}
       </span>
       <span className={css.name}>{member.name}</span>
       <span className={css.desc}>

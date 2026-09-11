@@ -112,6 +112,8 @@ describe('TeamPage', () => {
     render(<TeamPage state={{ ...READY, members: roster }} onStart={onStart} t={t} />)
     expect(screen.getByText('AI 秘书')).toBeTruthy()
     expect(screen.getByText('AI 审计')).toBeTruthy()
+    // Busy presence renders the labelled chip, not the dot matrix.
+    expect(screen.getByText(zh['status.busy'])).toBeTruthy()
     expect(screen.queryByText('标准模式')).toBeNull()
     expect(screen.queryByText('经营团队')).toBeNull()
     expect(screen.queryByText('PTC模式')).toBeNull()

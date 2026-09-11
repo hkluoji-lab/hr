@@ -46,7 +46,8 @@
   }
 
   .main > .memberGrid {
-    max-width: none;
+    max-width: 1120px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
@@ -179,10 +180,11 @@
   color: #978da2;
 }
 
-/* The role row spreads wider than the quick actions; on wide frames it fills
-   the hero's content column beside the side-card stack. */
+/* The roster is exactly the four company roles, so the columns are
+   deterministic: 2×2 below the wide breakpoint, one row of four on wide
+   frames — auto-fit's ragged 3+1 row never appears. */
 .memberGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
