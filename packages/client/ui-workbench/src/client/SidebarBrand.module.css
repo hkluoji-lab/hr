@@ -1,19 +1,16 @@
-/* Placeholder brand tile: pink gradient square with the 星 glyph until the
-   hexagon logo asset lands. The shell requests a 24px square. */
+/* Brand tile: pink gradient rounded square carrying the white stacked-layers
+   mark drawn inline by SidebarBrandMark. The shell requests a 24px square. */
 .mark {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: none;
-  background: linear-gradient(135deg, #f09acb 0%, #d674c2 100%);
-  box-shadow: 0 1px 3px rgba(201, 91, 169, 0.3);
+  background: linear-gradient(135deg, #f7b3d2 0%, #e08bc8 55%, #d678c1 100%);
+  box-shadow: 0 1px 3px rgba(201, 91, 169, 0.35);
 }
 
 .markGlyph {
-  color: #ffffff;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0;
+  display: block;
 }
 
 /* Wordmark row: brand name with the red 秘 badge at its top-right corner. */

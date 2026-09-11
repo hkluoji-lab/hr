@@ -1,9 +1,8 @@
 /**
  * Deployment branding occupants for the sidebar shell's two `single` brand
- * slots. The pink logo tile replaces the shell's fish fallback in both the
- * expanded brand row and the collapsed rail; the wordmark occupant replaces
- * the generic local-build name with 星耀智 plus the red 秘 badge. Both are
- * text placeholders reproducing the design until brand image assets land.
+ * slots. The logo tile draws the design's pink-gradient rounded square with
+ * the white stacked-layers mark, in both the expanded brand row and the
+ * collapsed rail; the wordmark occupant renders 星耀智 plus the red 秘 badge.
  */
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: pulls ui-sidebar's SlotMap merge (the two brand seats).
@@ -17,11 +16,12 @@ export type SidebarBrandMarkProps =
   & PropsLocale<typeof NS>
 
 /**
- * Render the pink logo tile with the placeholder 星 glyph.
+ * Render the pink logo tile with the white stacked-layers mark.
  * @param props - the shell's requested square edge and the translate seat.
  * @returns the tile at the requested size.
  */
 export function SidebarBrandMark({ size, t }: SidebarBrandMarkProps) {
+  const glyph = Math.round(size * 0.62)
   return (
     <span
       className={css.mark}
@@ -33,13 +33,22 @@ export function SidebarBrandMark({ size, t }: SidebarBrandMarkProps) {
       role="img"
       aria-label={t('brand.name')}
     >
-      <span
+      <svg
         className={css.markGlyph}
-        style={{ fontSize: Math.round(size * 0.58) }}
+        viewBox="0 0 24 24"
+        width={glyph}
+        height={glyph}
+        fill="none"
+        stroke="#ffffff"
+        strokeWidth={2.4}
+        strokeLinejoin="round"
+        strokeLinecap="round"
         aria-hidden="true"
       >
-        {t('brand.markGlyph')}
-      </span>
+        <path d="M12 3.5 20.5 8 12 12.5 3.5 8Z" fill="#ffffff" />
+        <path d="m5 12.4 7 3.8 7-3.8" />
+        <path d="m5 16.8 7 3.7 7-3.7" />
+      </svg>
     </span>
   )
 }
