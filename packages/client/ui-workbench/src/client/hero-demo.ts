@@ -1,13 +1,11 @@
 /**
  * Placeholder content for the hero's right-side cards. The bounty balance
- * falls back to the host credits service when a deployment composes one;
- * progress rows and deliverable files have no backing service yet, so they
- * reproduce the design mock as typed placeholders pending that data seam.
+ * reads the host credits service when a deployment composes one; the
+ * month-left figure, progress rows, and deliverable files have no backing
+ * service yet, so they reproduce the design mock as typed placeholders
+ * pending that data seam.
  */
 import type { WorkbenchKey } from './locales.ts'
-
-/** Bounty card fallback: 100,000 available points. */
-export const DEMO_CREDITS_BALANCE = 100000
 
 /** Bounty card fallback: 87,420 points left this month. */
 export const DEMO_CREDITS_MONTH_LEFT = 87420

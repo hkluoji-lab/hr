@@ -38,6 +38,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+}
+
+/* Marks placeholder content (pending data seams, or the snapshot being
+   unreachable) so demo figures never read as live numbers. */
+.demoChip {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f6e7f2;
+  color: #a06a96;
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .cardTitle {

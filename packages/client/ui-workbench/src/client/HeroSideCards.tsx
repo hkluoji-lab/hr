@@ -3,23 +3,24 @@
  * progress, and deliverables. The app frame only mounts the right column for
  * an open session, so on the blank-session hero this stack is the hero grid's
  * second column on wide viewports and stays hidden on narrow ones. Presence
- * reads the shared workbench snapshot; the bounty balance, progress rows, and
- * deliverables are typed placeholders (hero-demo.ts) reproducing the design
- * pending their data seams.
+ * and the credits balance read the shared workbench snapshot; the month-left
+ * figure, progress rows, and deliverables are typed placeholders
+ * (hero-demo.ts) reproducing the design pending their data seams, and carry a
+ * demo-data chip so they never read as live numbers.
  */
 import type { ReactNode } from 'react'
 import { IconChevronDownOutline14, IconDownloadOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import {
-  DEMO_CREDITS_BALANCE, DEMO_CREDITS_MONTH_LEFT, DEMO_DELIVERABLE_KEYS, DEMO_PROGRESS,
+  DEMO_CREDITS_MONTH_LEFT, DEMO_DELIVERABLE_KEYS, DEMO_PROGRESS,
 } from './hero-demo.ts'
 import type { TeamMemberState, WorkbenchState } from './workbench-store.ts'
 import css from './HeroSideCards.module.css'
 
 /** Props for the hero side stack. */
 export interface HeroSideCardsProps {
-  /** Presence counts from the shared workbench snapshot. */
-  state: Pick<WorkbenchState, 'online' | 'busy' | 'offline'>
+  /** Presence counts and credits balance from the shared workbench snapshot. */
+  state: Pick<WorkbenchState, 'online' | 'busy' | 'offline' | 'credits'>
   /** Namespace-bound translate. */
   t: TranslateNS<'workbench'>
 }
@@ -42,10 +43,9 @@ function points(value: number): string {
  * @returns the hero grid's side-card column.
  */
 export function HeroSideCards({ state, t }: HeroSideCardsProps): ReactNode {
-  // The hero bounty card reproduces the design mock until its data seam lands;
-  // the session-scoped Credits tab stays the real-balance surface.
-  const balance = DEMO_CREDITS_BALANCE
-  const monthLeft = DEMO_CREDITS_MONTH_LEFT
+  // The balance is the shared snapshot's number, or an em dash while the host
+  // workbench service is unreachable; the month-left seam is still pending.
+  const balance = state.credits
   const counts: Record<TeamMemberState, number> = {
     online: state.online, busy: state.busy, offline: state.offline,
   }
@@ -56,12 +56,13 @@ export function HeroSideCards({ state, t }: HeroSideCardsProps): ReactNode {
           <span className={css.cardTitle}>{t('right.credits.title')}</span>
           <span className={css.minus} aria-hidden="true">−</span>
         </div>
-        <div className={css.balanceValue}>{points(balance)}</div>
+        <div className={css.balanceValue}>{balance === null ? '—' : points(balance)}</div>
         <div className={css.creditsSub}>
           <span>{t('right.credits.available')}</span>
           <span className={css.dotSep} aria-hidden="true">·</span>
-          <span>{t('right.credits.monthLeft', { n: points(monthLeft) })}</span>
+          <span>{t('right.credits.monthLeft', { n: balance === null ? '—' : points(DEMO_CREDITS_MONTH_LEFT) })}</span>
         </div>
+        {balance === null && <span className={css.demoChip}>{t('right.credits.demo')}</span>}
       </section>
 
       <section className={css.card} data-workbench-card="team-status">
@@ -83,6 +84,7 @@ export function HeroSideCards({ state, t }: HeroSideCardsProps): ReactNode {
       <section className={css.card} data-workbench-card="progress">
         <div className={css.cardHead}>
           <span className={css.cardTitle}>{t('right.progress.title')}</span>
+          <span className={css.demoChip}>{t('right.credits.demo')}</span>
         </div>
         <div className={css.progressList}>
           {DEMO_PROGRESS.map(row => (
@@ -102,6 +104,7 @@ export function HeroSideCards({ state, t }: HeroSideCardsProps): ReactNode {
       <section className={css.card} data-workbench-card="deliverables">
         <div className={css.cardHead}>
           <span className={css.cardTitle}>{t('right.deliverables.title')}</span>
+          <span className={css.demoChip}>{t('right.credits.demo')}</span>
         </div>
         <ul className={css.fileList}>
           {DEMO_DELIVERABLE_KEYS.map(key => {

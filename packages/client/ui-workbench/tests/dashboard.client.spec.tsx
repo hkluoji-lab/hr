@@ -112,12 +112,18 @@ describe('WorkbenchDashboard hero copy', () => {
 })
 
 describe('WorkbenchDashboard right-side cards', () => {
-  it('shows the design-mock bounty balance and month remainder', () => {
-    // The hero card is a typed placeholder until its data seam lands; the
-    // real balance lives in the session-scoped Credits tab.
+  it('shows the snapshot credits balance and marks the pending month seam as demo', () => {
     setup({ ...READY, credits: 1280 }, 10)
-    expect(screen.getByText('100,000')).toBeTruthy()
+    expect(screen.getByText('1,280')).toBeTruthy()
     expect(screen.getByText(/87,420/)).toBeTruthy()
+    expect(screen.getAllByText(zh['right.credits.demo']).length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('falls back to an em dash and a demo chip while the credits read is null', () => {
+    setup({ ...READY, credits: null }, 10)
+    expect(screen.getByText('—')).toBeTruthy()
+    expect(screen.queryByText('100,000')).toBeNull()
+    expect(screen.getAllByText(zh['right.credits.demo']).length).toBeGreaterThanOrEqual(3)
   })
 
   it('lists presence counts, progress rows, and deliverables', () => {
