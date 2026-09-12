@@ -5,11 +5,14 @@
  * and the browsing region. The rail shows the target's glyph with a tooltip;
  * the wide column adds the label.
  *
- * Four targets toggle a frame-wide page; `projects` is a command that reveals
+ * Five targets toggle a frame-wide page; `projects` is a command that reveals
  * the sidebar's own project/Workspace browser instead of covering the frame.
- * The AI-team entry additionally renders the design's role groups inline: the
- * four secretary-company roles, each expandable to its capability entries that
- * open the team page (wide column only; the rail shows the glyph alone).
+ * The AI-team entry additionally renders the design's role groups inline —
+ * scoped to the caller's bound roles the same way the roster is — each
+ * expandable to its capability entries that open the team page (wide column
+ * only; the rail shows the glyph alone). The members entry is the owner's:
+ * registered like every nav row, it renders null until the auth status
+ * reports the caller as the deployment owner.
  */
 import { useState, useSyncExternalStore } from 'react'
 import {
@@ -20,18 +23,20 @@ import {
   IconListPenOutline16,
   IconPlayOutline16,
   IconSparkle16,
+  IconUserOutline16,
   Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: pulls the ui-sidebar SlotMap merge (the navigation seat).
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { WorkbenchController, WorkbenchPageId } from './workbench-store.ts'
-import { ROLES, type RoleMeta } from './roles.ts'
+import { scopedRoles, type MyStatus } from './workbench-store.ts'
+import type { RoleMeta } from './roles.ts'
 import { NS, type WorkbenchKey } from './locales.ts'
 import css from './WorkbenchNavAction.module.css'
 
 /** A surface a sidebar navigation entry activates. */
-export type WorkbenchNavTarget = 'hall' | 'assistant' | 'active' | 'team' | 'projects'
+export type WorkbenchNavTarget = 'hall' | 'assistant' | 'active' | 'team' | 'projects' | 'members'
 
 /** Glyph, label, and the page each nav target drives (null = command). */
 const TARGETS: Record<WorkbenchNavTarget, {
@@ -44,6 +49,7 @@ const TARGETS: Record<WorkbenchNavTarget, {
   active: { icon: IconPlayOutline16, label: 'nav.active', page: 'active' },
   team: { icon: IconAgentPresetOutline16, label: 'nav.team', page: 'team' },
   projects: { icon: IconFolderClose16, label: 'nav.projects', page: null },
+  members: { icon: IconUserOutline16, label: 'nav.members', page: 'members' },
 }
 
 /** Registration-side business face for one sidebar navigation entry. */
@@ -56,6 +62,8 @@ export interface WorkbenchNavInjected {
   activate: () => void
   /** Open the AI-team page; the role capability children activate through it. */
   openTeam: () => void
+  /** The caller's role binding; the members entry gates on its owner flag. */
+  useMy: () => MyStatus
 }
 
 /** Full component props. */
@@ -70,10 +78,15 @@ export type WorkbenchNavActionProps =
  * @returns the labelled row (wide) or the rail glyph button; the team entry
  *   appends its role groups.
  */
-export function WorkbenchNavAction({ wide, t, target, useActive, activate, openTeam }: WorkbenchNavActionProps) {
+export function WorkbenchNavAction({ wide, t, target, useActive, activate, openTeam, useMy }: WorkbenchNavActionProps) {
   const active = useActive()
+  const my = useMy()
   const label = t(TARGETS[target].label)
   const Icon = TARGETS[target].icon
+
+  // The members page is the owner's management surface: the row stays
+  // registered like every nav row, but renders nothing for everyone else.
+  if (target === 'members' && !my.isOwner) return null
 
   // Expansion is this row's presentation state, not page state; everything
   // ships collapsed so the seat stays short enough to reach the sidebar's
@@ -102,7 +115,7 @@ export function WorkbenchNavAction({ wide, t, target, useActive, activate, openT
   if (target !== 'team') return button
 
   const toggleRole = (id: RoleMeta['id']): void => {
-    setRolesOpen(prev => {
+    setRolesOpen((prev) => {
       const next = new Set(prev)
       if (next.has(id)) {
         next.delete(id)
@@ -129,7 +142,7 @@ export function WorkbenchNavAction({ wide, t, target, useActive, activate, openT
       </div>
       {groupOpen && (
         <div className={css.children}>
-          {ROLES.map(role => {
+          {scopedRoles(my).map((role) => {
             const roleOpen = rolesOpen.has(role.id)
             return (
               <div key={role.id}>
@@ -173,7 +186,9 @@ export function WorkbenchNavAction({ wide, t, target, useActive, activate, openT
  * Build one nav entry's face: a page target toggles that page and reports its
  * own active state from the page store; the `projects` command reveals the
  * sidebar and is never current; `openTeam` shows the team page without
- * toggling, which the role capability children activate through.
+ * toggling, which the role capability children activate through. The face
+ * also binds the caller's role binding, which scopes the team entry's role
+ * groups and gates the owner-only members entry.
  * @param controller - the workbench controller owning page state.
  * @param target - the surface this entry activates.
  * @returns the inject face for the navigation slot.
@@ -197,5 +212,9 @@ export function navActionFace(
       controller.togglePage(page)
     },
     openTeam: () => { controller.openPage('team') },
+    useMy: () => useSyncExternalStore(
+      listener => controller.store.subscribe(listener),
+      () => controller.store.getSnapshot().my,
+    ),
   }
 }

@@ -2,21 +2,25 @@
 /**
  * The workbench page surface: the hall's rows, the active-tasks filter, the
  * task assistant's brief form, the team grid, the report's
- * metrics/ledger/grant form, and the shell that hosts them — closed state,
- * Escape/close dismissal, and the reads an open page triggers.
+ * metrics/ledger/grant form, the owner's member management (invites, roster,
+ * unbind), and the shell that hosts them — closed state, Escape/close
+ * dismissal, and the reads an open page triggers.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, act } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, act, within } from '@testing-library/react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
+import type { MemberListEntry } from '@deepseek-ai/dsh-web-login/shared'
 import {
   WorkbenchShell, createTaskRowsHook, type WorkbenchShellProps,
 } from '../src/client/WorkbenchShell.tsx'
 import { AssistantPage, type AssistantPageProps } from '../src/client/pages/AssistantPage.tsx'
+import { MembersPage, type MembersPageProps } from '../src/client/pages/MembersPage.tsx'
 import { TaskHallPage, type TaskHallPageProps } from '../src/client/pages/TaskHallPage.tsx'
 import { TeamPage } from '../src/client/pages/TeamPage.tsx'
 import { ReportPage, type ReportPageProps } from '../src/client/pages/ReportPage.tsx'
 import type {
-  LedgerState, TaskRow, TeamMember, WorkbenchPagesState, WorkbenchState,
+  InviteOutcome, LedgerState, MembersState, TaskRow, TeamMember, WorkbenchPagesState,
+  WorkbenchState,
 } from '../src/client/workbench-store.ts'
 import { ROLES } from '../src/client/roles.ts'
 import { zh } from '../src/client/locales.ts'
@@ -35,6 +39,8 @@ const MEMBERS: readonly TeamMember[] = [
 
 const READY: WorkbenchState = {
   status: 'ready', error: null, members: MEMBERS, online: 1, busy: 1, offline: 0, credits: 1280,
+  userName: null,
+  my: { name: null, roles: [], isOwner: false },
   todayCount: 2, runningCount: 1, doneCount: 1,
 }
 
@@ -315,21 +321,126 @@ describe('ReportPage', () => {
   })
 })
 
+describe('MembersPage', () => {
+  const ENTRY: MemberListEntry = {
+    phone: '13800138000', displayName: '138****8000', roles: ['accountant'],
+    grantedBy: '139****9000', grantedAt: 0,
+  }
+
+  /** Roster snapshot fixtures for the three read lifecycles the page renders. */
+  const ROSTER: Record<'ready' | 'loading' | 'error', MembersState> = {
+    ready: { status: 'ready', error: null, members: [ENTRY] },
+    loading: { status: 'loading', error: null, members: [] },
+    error: { status: 'error', error: 'owner only', members: [] },
+  }
+
+  function props(over: Partial<MembersPageProps> = {}): MembersPageProps {
+    return {
+      members: ROSTER.ready,
+      onCreate: vi.fn((): Promise<InviteOutcome> =>
+        Promise.resolve({ ok: true, code: 'AB_cd12', expiresAt: 1_800_000_000_000 })),
+      onUnbind: vi.fn((): Promise<string | null> => Promise.resolve(null)),
+      t,
+      ...over,
+    }
+  }
+
+  it('renders the invite form with the four role checks and the empty-roster notes', () => {
+    render(<MembersPage {...props({ members: ROSTER.loading })} />)
+    for (const role of ROLES) {
+      expect(screen.getByRole('checkbox', { name: new RegExp(zh[`nav.role.${role.id}`]) })).toBeTruthy()
+    }
+    expect(screen.getByText(zh['members.invite.none'])).toBeTruthy()
+    expect(screen.getByText(zh['members.list.loading'])).toBeTruthy()
+    expect(screen.getByRole('button', { name: zh['members.invite.create'] }).hasAttribute('disabled'))
+      .toBe(true)
+  })
+
+  it('creates an invite from the checked roles and shows the code with its expiry', async () => {
+    const onCreate = vi.fn((): Promise<InviteOutcome> =>
+      Promise.resolve({ ok: true, code: 'AB_cd12', expiresAt: 1_800_000_000_000 }))
+    render(<MembersPage {...props({ onCreate })} />)
+
+    fireEvent.click(screen.getByRole('checkbox', { name: new RegExp(zh['nav.role.accountant']) }))
+    fireEvent.click(screen.getByRole('checkbox', { name: new RegExp(zh['nav.role.legal']) }))
+    fireEvent.click(screen.getByRole('button', { name: zh['members.invite.create'] }))
+
+    await vi.waitFor(() => {
+      expect(onCreate).toHaveBeenCalledWith(['accountant', 'legal'])
+      expect(screen.getByText('AB_cd12')).toBeTruthy()
+    })
+    expect(screen.getByText(zh['members.invite.hint'])).toBeTruthy()
+    expect(screen.queryByText(zh['members.invite.none'])).toBeNull()
+  })
+
+  it('shows the host refusal when the invite fails', async () => {
+    const onCreate = vi.fn((): Promise<InviteOutcome> => Promise.resolve({ ok: false, error: 'owner only' }))
+    render(<MembersPage {...props({ onCreate })} />)
+
+    fireEvent.click(screen.getByRole('checkbox', { name: new RegExp(zh['nav.role.secretary']) }))
+    fireEvent.click(screen.getByRole('button', { name: zh['members.invite.create'] }))
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole('alert').textContent)
+        .toBe(zh['members.invite.failed'].replace('{message}', 'owner only'))
+    })
+    expect(screen.queryByText(zh['members.invite.code'])).toBeNull()
+  })
+
+  it('lists the roster with roles, grant metadata, and unbind actions', async () => {
+    const onUnbind = vi.fn((): Promise<string | null> => Promise.resolve(null))
+    render(<MembersPage {...props({ onUnbind })} />)
+
+    const list = screen.getByRole('list')
+    expect(within(list).getByText('138****8000')).toBeTruthy()
+    expect(within(list).getByText('AI 会计')).toBeTruthy()
+    // The meta span appends the relative grant time after the grantor, so match by prefix.
+    expect(within(list).getByText((_, el) =>
+      el?.textContent?.startsWith(zh['members.list.grantedBy'].replace('{name}', '139****9000')) === true,
+    )).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: zh['members.unbind'] }))
+    await vi.waitFor(() => { expect(onUnbind).toHaveBeenCalledWith('13800138000') })
+  })
+
+  it('notes an empty roster, a failed read, and a refused unbind', async () => {
+    const onUnbind = vi.fn((): Promise<string | null> => Promise.resolve('owner only'))
+    const { unmount } = render(<MembersPage {...props({ members: ROSTER.error, onUnbind })} />)
+    expect(screen.getByText(zh['members.list.error'].replace('{message}', 'owner only'))).toBeTruthy()
+    unmount()
+
+    const empty = render(<MembersPage {...props({ members: { ...ROSTER.ready, members: [] }, onUnbind })} />)
+    expect(screen.getByText(zh['members.list.empty'])).toBeTruthy()
+    empty.unmount()
+
+    render(<MembersPage {...props({ onUnbind })} />)
+    fireEvent.click(screen.getByRole('button', { name: zh['members.unbind'] }))
+    await vi.waitFor(() => {
+      expect(screen.getByRole('alert').textContent)
+        .toBe(zh['members.unbind.failed'].replace('{message}', 'owner only'))
+    })
+  })
+})
+
 describe('WorkbenchShell', () => {
   function props(open: WorkbenchPagesState['open'], over: Partial<WorkbenchShellProps> = {}): WorkbenchShellProps {
     const handlers = {
       load: vi.fn(() => Promise.resolve()),
       loadLedger: vi.fn(() => Promise.resolve()),
+      loadMembers: vi.fn(() => Promise.resolve()),
       close: vi.fn(),
       openSession: vi.fn(),
       startWithPreset: vi.fn(),
       assignTask: vi.fn(),
       grantCredits: vi.fn(() => Promise.resolve(null)),
+      createInvite: vi.fn((): Promise<InviteOutcome> => Promise.resolve({ ok: true, code: 'x', expiresAt: 1 })),
+      unbindMember: vi.fn((): Promise<string | null> => Promise.resolve(null)),
     }
     return {
       usePages: <S,>(select: (snapshot: WorkbenchPagesState) => S) => select({ open }),
       useWorkbench: <S,>(select: (snapshot: WorkbenchState) => S) => select(READY),
       useLedger: <S,>(select: (snapshot: LedgerState) => S) => select({ status: 'ready', error: null, entries: [] }),
+      useMembers: <S,>(select: (snapshot: MembersState) => S) => select({ status: 'ready', error: null, members: [] }),
       useTasks: () => [] as readonly TaskRow[],
       ...handlers,
       t,
@@ -401,6 +512,24 @@ describe('WorkbenchShell', () => {
     fireEvent.change(screen.getByLabelText(zh['assistant.brief']), { target: { value: '写一份周报' } })
     fireEvent.click(screen.getByRole('button', { name: zh['assistant.submit'] }))
     expect(assignTask).toHaveBeenCalledWith(undefined, '写一份周报')
+  })
+
+  it('renders the members page for the owner and reads the roster', async () => {
+    const loadMembers = vi.fn(() => Promise.resolve())
+    render(<WorkbenchShell {...props('members', {
+      loadMembers,
+      useWorkbench: <S,>(select: (snapshot: WorkbenchState) => S) =>
+        select({ ...READY, my: { name: null, roles: [], isOwner: true } }),
+    })} />)
+    expect(screen.getByRole('heading', { name: zh['nav.members'] })).toBeTruthy()
+    expect(screen.getByText(zh['members.subtitle'])).toBeTruthy()
+    await vi.waitFor(() => { expect(loadMembers).toHaveBeenCalledTimes(1) })
+  })
+
+  it('leaves the members page body out for a non-owner', () => {
+    render(<WorkbenchShell {...props('members')} />)
+    expect(screen.getByRole('heading', { name: zh['nav.members'] })).toBeTruthy()
+    expect(screen.queryByText(zh['members.subtitle'])).toBeNull()
   })
 })
 

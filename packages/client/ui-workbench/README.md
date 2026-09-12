@@ -1,5 +1,5 @@
 ---
-description: "Web workbench surfaces: the blank-session hero dashboard (greeting, quick actions, credits, agent-preset team roster), five sidebar nav entries (Task hall, Task assistant, Active tasks, AI team, Projects) opening frame-wide pages, and session-scoped deliverables, subtask-progress, credits, and AI-team-status tabs in the right Sidebar; for users and maintainers of the workbench surfaces."
+description: "Web workbench surfaces: the blank-session hero dashboard (greeting, quick actions, credits, agent-preset team roster), five sidebar nav entries (Task hall, Task assistant, Active tasks, AI team, Projects) plus an owner-only Members entry opening frame-wide pages, and session-scoped deliverables, subtask-progress, credits, and AI-team-status tabs in the right Sidebar; for users and maintainers of the workbench surfaces."
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-This package renders the workbench on the Web GUI: a blank-session hero dashboard (greeting, live-team subtitle, four quick actions, agent-preset team cards) and the product's primary navigation — five `sidebar.nav` entries: Task hall, Task assistant, Active tasks, AI team, and Projects. One `agentPresets.list` Remote read feeds the roster (busy, online, or offline), and a card stages its preset. Four entries open frame-wide `shell.overlay` pages — cross-session task rows, the brief form, the running-task filter, and the team grid — while Projects reveals the workspace browser. Session-scoped right-Sidebar tabs show Deliverables, Progress, Credits, and AI team status.
+This package renders the workbench on the Web GUI: a blank-session hero dashboard (greeting, live-team subtitle, four quick actions, agent-preset team cards) and five `sidebar.nav` nav entries — Task hall, Task assistant, Active tasks, AI team, Projects. One `agentPresets.list` read feeds the roster; four entries open frame-wide `shell.overlay` pages and Projects reveals the workspace browser. The workbench reads `/auth/status` and scopes the roster to the caller's bound roles; the owner gains an owner-only Members page (invites, roster, unbinding). Session-scoped right-Sidebar tabs show Deliverables, Progress, Credits, and AI team status.
 
 ## Table of Contents
 
@@ -31,6 +31,8 @@ The sidebar's primary navigation gains five additive entries directly under New 
 
 "Call the AI team" and "Monthly report" on the hero open those same team and report pages.
 
+The workbench scopes itself to the caller's member binding, read from the login surface's `/auth/status` as `{name, roles, isOwner}`. The greeting appends the bound roles (`greeting.roles`), and the roster, task-assistant member picker, and team page filter to the caller's roles plus the role-less presets — the owner and unbound visitors see the full roster, so an unbound deployment renders exactly as before. The owner additionally gets a **Members** nav entry opening a frame-wide page: check roles to mint a single-use invite code (shown with its expiry), read the roster with grant metadata, and unbind a member; the nav entry renders only for the owner.
+
 With a session open, the right Sidebar gains four builtin page tabs, all also offered as guide-page entries. **Deliverables** lists every file the session's successful `write`, `edit`, and mutating `str_replace_editor` calls produced, deduplicated in first-seen order; a row opens the file through the Sidebar's resource address. **Progress** lists the session's subagent children in session-store order with a running/settled dot; a row opens that child session. **Credits** shows the deployment balance and the recent grant ledger. **AI team status** counts the company's role members online, working, and offline, then lists each role member with its state dot. A tab with nothing to show renders one empty, loading, or failed-read line.
 
 ### Empty deployments
@@ -45,9 +47,9 @@ A deployment that composes no presets (or runs without the agent-presets service
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-One `WorkbenchController` backs every surface, so a nav entry and a hero shortcut drive the same page state. It holds three snapshot stores: the team/credits dashboard, the open-page id, and the credits ledger. `load()` issues one `agentPresets.list` call (treating `gateway/invocation-unavailable` as an empty roster, matching the other preset surfaces), folds the session list to mark presets with a non-blank session `busy`, and sorts broken presets last as `offline`. `startWithPreset(id)` mirrors the hero preset chip: stage the id, call `uiWorkspace.startSession()`, and on the next session-list change apply `agentPresets.select` to the new blank session — the host refuses composing a non-blank session. `assignTask(presetId, brief)` runs that same start and then submits the brief as the session's first user message once the binding exists.
+One `WorkbenchController` backs every surface, so a nav entry and a hero shortcut drive the same page state. It holds three snapshot stores: the team/credits dashboard, the open-page id, and the credits ledger. `load()` issues one `agentPresets.list` call (treating `gateway/invocation-unavailable` as an empty roster, matching the other preset surfaces), folds the session list to mark presets with a non-blank session `busy`, and sorts broken presets last as `offline`. `startWithPreset(id)` mirrors the hero preset chip: stage the id, call `uiWorkspace.startSession()`, and on the next session-list change apply `agentPresets.select` to the new blank session — the host refuses composing a non-blank session. `assignTask(presetId, brief)` runs that same start and then submits the brief as the session's first user message once the binding exists. `load()` also probes the same-origin `/auth/status` once (failing silently to the unbound visitor shape), and `scopedRoles`/`scopedMembers` filter the role vocabulary and preset roster by that binding before any surface reads them.
 
-The hero contributes one entry to the `conversation.hero.dashboard` list slot (declared by ui-conversation, scope `root`). Five entries occupy the `sidebar.nav` list slot (declared by ui-sidebar, scope `root`), so no sidebar shell code changes: `navActionFace(controller, target)` binds a page target to `controller.togglePage` and derives the active state from the open-page store, binds Projects to `controller.viewProjects()`, which reveals the sidebar workspace browser, and binds `openTeam` to `controller.openPage('team')` for the team entry's capability children. The team entry renders the `ROLES` groups inline; expansion is row-local component state (everything ships collapsed so the seat stays short enough to reach the settings footer, and each chevron reveals on demand), and the children never become slot entries. The page surface is one entry in the `shell.overlay` list slot (declared by ui-layout, scope `root`); `WorkbenchShell` renders null while no page is open, keeping the overlay layer click-through, and dispatches to the hall, assistant, active-tasks, team, or report page. The hall folds the Session list (skipping blank and subagent sessions) through a hook cached on the list snapshot so `useSyncExternalStore` sees a stable reference.
+The hero contributes one entry to the `conversation.hero.dashboard` list slot (declared by ui-conversation, scope `root`). Six entries occupy the `sidebar.nav` list slot (declared by ui-sidebar, scope `root`), so no sidebar shell code changes: `navActionFace(controller, target)` binds a page target to `controller.togglePage` and derives the active state from the open-page store, binds Projects to `controller.viewProjects()`, which reveals the sidebar workspace browser, and binds `openTeam` to `controller.openPage('team')` for the team entry's capability children. The team entry renders the `ROLES` groups inline; expansion is row-local component state (everything ships collapsed so the seat stays short enough to reach the settings footer, and each chevron reveals on demand), and the children never become slot entries. The Members entry binds `useMy` at render time and renders null for anyone but the owner, so the slot registration stays static while the visibility follows the binding. The page surface is one entry in the `shell.overlay` list slot (declared by ui-layout, scope `root`); `WorkbenchShell` renders null while no page is open, keeping the overlay layer click-through, and dispatches to the hall, assistant, active-tasks, team, members, or report page. The hall folds the Session list (skipping blank and subagent sessions) through a hook cached on the list snapshot so `useSyncExternalStore` sees a stable reference. The members page drives the login surface's published `/team` routes — create invite, list members, unbind — through the same fetcher the controller probes `/auth/status` with.
 
 The report page reads the bounded ledger through the host workbench `ledger` Remote and grants through `addCredits`, refreshing the balance and the ledger from the host's own answer. `monthReport` tallies the local calendar month from the same hall rows and ledger entries.
 
@@ -93,6 +95,7 @@ These limits define the current surfaces. They are current package constraints, 
 - **The task assistant starts one session per brief** — the brief becomes that session's first user message and the page keeps no draft, history, or queue.
 - **The month report reads the bounded ledger** — credits granted outside the host's read limit are not counted, and the tally covers the local calendar month only.
 - **Tabs are session views, not cross-session reports** — Deliverables folds only the open session's loaded event window (deduplicated within it), and all four tabs mount only while a session is selected.
+- **Workspace scoping is client-side** — role bindings filter the rendered roster, picker, and team views and gate the login surface's management routes; task and session data are not isolated server-side by role.
 
 <a id="dev-note"></a>
 ### Dev Note
@@ -100,7 +103,7 @@ These limits define the current surfaces. They are current package constraints, 
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-None.
+The member binding — the `/auth/status` read, roster scoping, and the owner-only members page — is recorded in the [team member roles Agent Note](../../../.agents/notes/implemented/feature/2026-09-12-web-team-member-roles.md).
 
 </details>
 

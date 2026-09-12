@@ -1,15 +1,19 @@
 /**
  * Workbench plugin, browser half: the blank-session hero's
  * `conversation.hero.dashboard` entry (greeting, quick actions, team roster),
- * five additive `sidebar.nav` entries (task hall, task assistant, active
- * tasks, AI team, projects), and the `shell.overlay` page surface they open.
- * One controller backs all three so a nav entry and a hero shortcut drive the
- * same page state, and the right-Sidebar tabs read the same snapshots. The
- * roster arrives through one `agentPresets.list` Remote call; quick actions
- * drive the Workspace navigation service, member cards stage the member's
- * preset onto the blank session the start creates, a written assignment
- * additionally submits its brief as that session's first message, and the
- * report page reads and grants credits through the host workbench Remote.
+ * additive `sidebar.nav` entries (task hall, task assistant, active tasks, AI
+ * team, projects, and the owner-only members management), and the
+ * `shell.overlay` page surface they open. One controller backs all of them so
+ * a nav entry and a hero shortcut drive the same page state, and the
+ * right-Sidebar tabs read the same snapshots. The roster arrives through one
+ * `agentPresets.list` Remote call, the caller's role binding through one
+ * same-origin `/auth/status` read; quick actions drive the Workspace
+ * navigation service, member cards stage the member's preset onto the blank
+ * session the start creates, a written assignment additionally submits its
+ * brief as that session's first message, and the report page reads and grants
+ * credits through the host workbench Remote. Roster, nav role groups, and the
+ * assignment picker scope to the caller's bound roles; the members page and
+ * its nav row render only for the deployment owner.
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // Type-only: pulls the Session Controller service merge (ctx.sessions).
@@ -51,7 +55,8 @@ export type { WorkbenchDashboardProps, WorkbenchInjected } from './WorkbenchDash
 export type { WorkbenchNavActionProps, WorkbenchNavInjected, WorkbenchNavTarget } from './WorkbenchNavAction.tsx'
 export type { WorkbenchShellProps, WorkbenchShellInjected } from './WorkbenchShell.tsx'
 export type {
-  LedgerState, MonthReport, TaskRow, WorkbenchPageId, WorkbenchPagesState,
+  InviteOutcome, LedgerState, MembersState, MonthReport, MyStatus, TaskRow,
+  WorkbenchPageId, WorkbenchPagesState,
 } from './workbench-store.ts'
 export type { TeamMember, TeamMemberState, WorkbenchState } from './workbench-store.ts'
 export type { CreditsTabProps } from './tabs/CreditsTab.tsx'
@@ -66,7 +71,7 @@ export const inject = [
 ]
 
 /** Sidebar nav entries in the design's display order; each id is `workbench-<target>`. */
-const NAV_TARGETS: readonly WorkbenchNavTarget[] = ['hall', 'assistant', 'active', 'team', 'projects']
+const NAV_TARGETS: readonly WorkbenchNavTarget[] = ['hall', 'assistant', 'active', 'team', 'projects', 'members']
 
 /**
  * Mount the workbench dashboard on the blank-session hero.
@@ -144,15 +149,19 @@ export function apply(ctx: ClientContext): void {
         pages: controller.pages,
         workbench: controller.store,
         ledger: controller.ledger,
+        members: controller.members,
       },
       useTasks,
       load: () => controller.load(),
       loadLedger: () => controller.loadLedger(),
+      loadMembers: () => controller.loadMembers(),
       close: () => { controller.closePage() },
       openSession: (id) => { controller.openSession(id) },
       startWithPreset: (id: string) => { controller.startWithPreset(id) },
       assignTask: (presetId, brief) => { controller.assignTask(presetId, brief) },
       grantCredits: (amount, reason) => controller.grantCredits(amount, reason),
+      createInvite: roles => controller.createInvite(roles),
+      unbindMember: phone => controller.unbindMember(phone),
     })
 
     scope.effect(() => {

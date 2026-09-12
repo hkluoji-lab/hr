@@ -9,12 +9,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
-import { WorkbenchDashboard, type WorkbenchDashboardProps } from '../src/client/WorkbenchDashboard.tsx'
-import { roleOf, type RoleMeta } from '../src/client/roles.ts'
-import type { TeamMember, WorkbenchState } from '../src/client/workbench-store.ts'
+import {
+  WorkbenchDashboard, type GreetingKey, type WorkbenchDashboardProps,
+} from '../src/client/WorkbenchDashboard.tsx'
+import { roleOf } from '../src/client/roles.ts'
+import type { MyStatus, TeamMember, WorkbenchState } from '../src/client/workbench-store.ts'
 import { zh } from '../src/client/locales.ts'
 
 const t: WorkbenchDashboardProps['t'] = makeTranslate(zh)
+
+/** The visitor binding every unscoped fixture shares. */
+const MY_VISITOR: MyStatus = { name: null, roles: [], isOwner: false }
 
 /** Build one member card model; role-less presets carry the generic mark. */
 function member(over: Partial<TeamMember> & Pick<TeamMember, 'id' | 'name'>): TeamMember {
@@ -28,7 +33,7 @@ function member(over: Partial<TeamMember> & Pick<TeamMember, 'id' | 'name'>): Te
 
 /** A member carrying the named role's emoji/scope/tags metadata. */
 function roleMember(id: string, name: string, state: TeamMember['state'] = 'online'): TeamMember {
-  return member({ id, name, state, role: roleOf(name) as RoleMeta })
+  return member({ id, name, state, role: roleOf(name) })
 }
 
 /** Task counters shared by the ready fixtures. */
@@ -46,6 +51,8 @@ const READY: WorkbenchState = {
   busy: 1,
   offline: 1,
   credits: null,
+  userName: null,
+  my: MY_VISITOR,
   ...COUNTS,
 }
 
@@ -76,8 +83,17 @@ afterEach(() => {
 
 describe('WorkbenchDashboard hero copy', () => {
   it('greets by local hour with the highlighted user name', () => {
-    const expected = (hourKey: 'greeting.morning' | 'greeting.afternoon' | 'greeting.evening') =>
-      `${zh[hourKey]}${zh['greeting.name']}。${zh['greeting.suffix']}`
+    const expected = (hourKey: GreetingKey) =>
+      `${zh[hourKey]}${zh['greeting.name']}${zh['greeting.suffix']}`
+
+    // Deep night still greets as evening.
+    const night = setup(READY, 2)
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(expected('greeting.evening'))
+    night.unmount()
+
+    const early = setup(READY, 7)
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(expected('greeting.early'))
+    early.unmount()
 
     const morning = setup(READY, 9)
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(expected('greeting.morning'))
@@ -89,6 +105,34 @@ describe('WorkbenchDashboard hero copy', () => {
 
     setup(READY, 21)
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(expected('greeting.evening'))
+  })
+
+  it('greets the logged-in account when the host reports its name', () => {
+    setup({ ...READY, userName: 'luoji' }, 10)
+    expect(screen.getByText('luoji')).toBeTruthy()
+    expect(screen.queryByText(zh['greeting.name'])).toBeNull()
+  })
+
+  it('falls back to the locale name when the host reports no account', () => {
+    setup({ ...READY, userName: null }, 10)
+    expect(screen.getByText(zh['greeting.name'])).toBeTruthy()
+  })
+
+  it('greets the bound member by the auth display name, ahead of the host account name', () => {
+    setup({ ...READY, userName: 'luoji', my: { name: '张*三', roles: [], isOwner: false } }, 10)
+    expect(screen.getByText('张*三')).toBeTruthy()
+    expect(screen.queryByText('luoji')).toBeNull()
+    expect(screen.queryByText(zh['greeting.name'])).toBeNull()
+  })
+
+  it('appends the bound roles to the greeting and stays silent for visitors', () => {
+    const bound = setup({ ...READY, my: { name: null, roles: ['secretary', 'audit'], isOwner: false } }, 10)
+    const roles = zh['greeting.roles'].replace('{roles}', 'AI 秘书 · AI 审计')
+    expect(screen.getByText(roles)).toBeTruthy()
+    bound.unmount()
+
+    setup(READY, 10)
+    expect(screen.queryByText(/（.*）/)).toBeNull()
   })
 
   it('counts today\u2019s tasks and online staff (healthy plus busy)', () => {
@@ -202,6 +246,8 @@ describe('WorkbenchDashboard team cards', () => {
   it('shows the empty-team note instead of cards when no presets exist', () => {
     const empty: WorkbenchState = {
       status: 'unavailable', error: null, members: [], online: 0, busy: 0, offline: 0, credits: null,
+      userName: null,
+      my: MY_VISITOR,
       ...COUNTS,
     }
     setup(empty, 10)

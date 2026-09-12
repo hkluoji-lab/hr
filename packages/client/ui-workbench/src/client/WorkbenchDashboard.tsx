@@ -49,8 +49,13 @@ export type WorkbenchDashboardProps =
   & PropsLocale<typeof NS>
   & InjectFace<WorkbenchInjected>
 
-/** Greeting key by local hour: morning before 12, afternoon before 18. */
-function greetingKey(hour: number): 'greeting.morning' | 'greeting.afternoon' | 'greeting.evening' {
+/** Greeting key by local hour: early morning, late morning, afternoon, evening. */
+export type GreetingKey = 'greeting.early' | 'greeting.morning' | 'greeting.afternoon' | 'greeting.evening'
+
+/** Map the local hour onto the four greeting segments; deep night greets as evening. */
+function greetingKey(hour: number): GreetingKey {
+  if (hour < 5) return 'greeting.evening'
+  if (hour < 9) return 'greeting.early'
   if (hour < 12) return 'greeting.morning'
   if (hour < 18) return 'greeting.afternoon'
   return 'greeting.evening'
@@ -97,7 +102,7 @@ export function WorkbenchDashboard({
     const chrome = [slot.previousElementSibling, slot.nextElementSibling]
       .filter((node): node is HTMLElement => node instanceof HTMLElement)
     const previous = chrome.map(el => ({ el, display: el.style.display }))
-    chrome.forEach(el => { el.style.display = 'none' })
+    chrome.forEach((el) => { el.style.display = 'none' })
     return () => { previous.forEach(({ el, display }) => { el.style.display = display }) }
   }, [])
 
@@ -115,8 +120,11 @@ export function WorkbenchDashboard({
       <div className={css.main}>
         <h2 className={css.greeting}>
           <span>{t(greetingKey(new Date().getHours()))}</span>
-          <span className={css.userName}>{t('greeting.name')}</span>
-          <span>。{t('greeting.suffix')}</span>
+          <span className={css.userName}>{state.my.name ?? state.userName ?? t('greeting.name')}</span>
+          {state.my.roles.length > 0 && (
+            <span>{t('greeting.roles', { roles: state.my.roles.map(id => t(`nav.role.${id}`)).join(' · ') })}</span>
+          )}
+          <span>{t('greeting.suffix')}</span>
         </h2>
         <p className={css.subtitle}>
           {t('subtitle', { todo: state.todayCount, online: activeStaff })}
@@ -157,12 +165,12 @@ export function WorkbenchDashboard({
         {state.status === 'unavailable'
           ? <p className={css.teamEmpty}>{t('team.empty')}</p>
           : (
-              <div className={css.memberGrid}>
-                {roster.map(member => (
-                  <MemberCard key={member.id} member={member} onStart={startWithPreset} t={t} />
-                ))}
-              </div>
-            )}
+            <div className={css.memberGrid}>
+              {roster.map(member => (
+                <MemberCard key={member.id} member={member} onStart={startWithPreset} t={t} />
+              ))}
+            </div>
+          )}
       </div>
 
       <HeroSideCards state={state} t={t} />

@@ -347,3 +347,115 @@
   font-size: 12px;
   color: var(--dsw-alias-color-danger, #d94848);
 }
+
+/* Members management */
+
+.roleChecks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.roleCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  padding: 7px 14px;
+  border: 1px solid var(--dsh-border, #eceef2);
+  border-radius: 999px;
+  background: var(--dsh-surface, #ffffff);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--dsh-fg, #1f2329);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.roleCheck:has(input:checked) {
+  border-color: var(--dsh-accent, #b478e8);
+  color: var(--dsh-accent, #9a5cd6);
+  background: var(--dsh-accent-soft, #f3eafd);
+}
+
+.roleCheck input {
+  accent-color: var(--dsh-accent, #9a5cd6);
+  margin: 0;
+}
+
+.inviteBox {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--dsh-accent, #b478e8);
+  border-radius: 14px;
+  background: var(--dsh-accent-soft, #f3eafd);
+}
+
+.inviteLabel {
+  font-size: 12px;
+  color: var(--dsh-fg-muted, #8a8f99);
+}
+
+.inviteCode {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--dsh-accent, #9a5cd6);
+  user-select: all;
+}
+
+.inviteMeta {
+  font-size: 12px;
+  color: var(--dsh-fg-muted, #8a8f99);
+}
+
+.memberListRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--dsh-border, #eceef2);
+  border-radius: 12px;
+  background: var(--dsh-surface, #ffffff);
+  font-size: 14px;
+}
+
+.memberListName {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberListRoles {
+  font-size: 12px;
+  color: var(--dsh-accent, #9a5cd6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.memberListMeta {
+  font-size: 12px;
+  color: var(--dsh-fg-muted, #8a8f99);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 900px) {
+  .memberListRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .memberListRoles,
+  .memberListMeta {
+    display: none;
+  }
+}

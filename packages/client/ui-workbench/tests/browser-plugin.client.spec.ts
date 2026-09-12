@@ -1,12 +1,12 @@
 /**
  * ui-workbench plugin halves: the browser entry registers its dictionaries,
  * its four right-Sidebar tab types with their bodies, its hero dashboard, its
- * two sidebar brand occupants, its five sidebar nav entries, and the page
+ * two sidebar brand occupants, its six sidebar nav entries, and the page
  * surface (all removed on fiber teardown — HMR safety); the node entry stays
  * inert.
  */
 import { Context } from '@deepseek-ai/cordis'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { SidebarRightTabRegistry } from '@deepseek-ai/dsh-client-ui-sidebar-right/src/client/tab-registry.ts'
 import { stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
@@ -60,6 +60,21 @@ async function bench(): Promise<{
   sessions: { notify: () => void }
   calls: string[]
 }> {
+  // The controller reads the same-origin auth status and team routes through
+  // the global fetch; the stub answers the contract JSON without a network.
+  vi.stubGlobal('fetch', vi.fn(async (input: URL | string) => {
+    const url = String(input)
+    if (url.includes('/auth/status')) {
+      return new Response(JSON.stringify({ authenticated: false }), { status: 200 })
+    }
+    if (url.includes('/team/invites')) {
+      return new Response(JSON.stringify({ ok: true, code: 'stub-code', expiresAt: 1 }), { status: 200 })
+    }
+    if (url.includes('/team/members')) {
+      return new Response(JSON.stringify({ ok: true, owner: 'o', members: [] }), { status: 200 })
+    }
+    return new Response(JSON.stringify({}), { status: 404, headers: { 'content-type': 'application/json' } })
+  }))
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
   const tabs = new SidebarRightTabRegistry(ctx)
@@ -131,6 +146,8 @@ async function bench(): Promise<{
 }
 
 describe('ui-workbench browser half', () => {
+  afterEach(() => { vi.unstubAllGlobals() })
+
   it('declares the services it binds', () => {
     expect(inject).toEqual([
       'slots', 'locale', 'remote', 'remote.agentPresets', 'remote.workbench',
@@ -173,12 +190,13 @@ describe('ui-workbench browser half', () => {
     expect(entries[0]!.component).toBe(WorkbenchDashboard)
     expect(dashboardIds(ctx)).toContain('workbench')
 
-    // Five additive sidebar nav entries ride the same plugin fiber, in the
-    // design's order: task hall, task assistant, active tasks, AI team, projects.
+    // Six additive sidebar nav entries ride the same plugin fiber, in the
+    // design's order: task hall, task assistant, active tasks, AI team,
+    // projects, and the owner-only members management.
     expect(ctx.slots.entries('sidebar.nav').map(entry => entry.options.id))
       .toEqual([
         'workbench-hall', 'workbench-assistant', 'workbench-active',
-        'workbench-team', 'workbench-projects',
+        'workbench-team', 'workbench-projects', 'workbench-members',
       ])
 
     // The two deployment-brand occupants replace the shell brand fallbacks.
@@ -229,6 +247,9 @@ describe('ui-workbench browser half', () => {
       .inject!() as unknown as WorkbenchShellInjected
     await shell.load()
     await shell.loadLedger()
+    await shell.loadMembers()
+    expect(await shell.createInvite(['accountant'])).toMatchObject({ ok: true, code: 'stub-code' })
+    expect(await shell.unbindMember('13800138000')).toBeNull()
     shell.openSession('s1' as SessionId)
     shell.startWithPreset('minimal')
     shell.assignTask('minimal', '写一份周报')

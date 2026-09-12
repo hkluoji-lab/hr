@@ -161,6 +161,8 @@ const MEMBERS: readonly TeamMember[] = [
 
 const READY: WorkbenchState = {
   status: 'ready', error: null, members: MEMBERS, online: 1, busy: 1, offline: 1, credits: 1280,
+  userName: null,
+  my: { name: null, roles: [], isOwner: false },
   todayCount: 2, runningCount: 1, doneCount: 0,
 }
 

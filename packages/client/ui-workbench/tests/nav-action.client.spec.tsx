@@ -15,14 +15,19 @@ import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import {
   WorkbenchNavAction, navActionFace, type WorkbenchNavActionProps, type WorkbenchNavTarget,
 } from '../src/client/WorkbenchNavAction.tsx'
-import { WorkbenchController } from '../src/client/workbench-store.ts'
+import { WorkbenchController, type MyStatus } from '../src/client/workbench-store.ts'
 import { zh } from '../src/client/locales.ts'
 
 const t: WorkbenchNavActionProps['t'] = makeTranslate(zh)
 
+/** The visitor binding; every non-members row ignores it. */
+const MY_VISITOR: MyStatus = { name: null, roles: [], isOwner: false }
+
 function props(over: Partial<WorkbenchNavActionProps>): WorkbenchNavActionProps {
   return {
-    wide: true, t, target: 'hall', useActive: () => false, activate: vi.fn(), openTeam: vi.fn(), ...over,
+    wide: true, t, target: 'hall', useActive: () => false, activate: vi.fn(), openTeam: vi.fn(),
+    useMy: () => MY_VISITOR,
+    ...over,
   } as unknown as WorkbenchNavActionProps
 }
 
@@ -99,6 +104,38 @@ describe('WorkbenchNavAction', () => {
     fireEvent.click(toggle)
     expect(screen.queryByRole('button', { name: zh['nav.role.secretary'] })).toBeNull()
   })
+
+  it('renders the owner-only members row for the owner and nothing for everyone else', () => {
+    const activate = vi.fn()
+    render(<WorkbenchNavAction {...props({
+      target: 'members', activate, useMy: () => ({ name: null, roles: [], isOwner: true }),
+    })} />)
+    const row = screen.getByRole('button', { name: zh['nav.members'] })
+    fireEvent.click(row)
+    expect(activate).toHaveBeenCalledTimes(1)
+
+    cleanup()
+    render(<WorkbenchNavAction {...props({ target: 'members', activate })} />)
+    expect(screen.queryByRole('button', { name: zh['nav.members'] })).toBeNull()
+
+    cleanup()
+    render(<WorkbenchNavAction {...props({
+      wide: false, target: 'members', useMy: () => ({ name: null, roles: [], isOwner: true }),
+    })} />)
+    expect(screen.getByRole('button', { name: zh['nav.members'] })).toBeTruthy()
+  })
+
+  it('scopes the team role groups to the bound member\'s roles', () => {
+    render(<WorkbenchNavAction {...props({
+      target: 'team',
+      useMy: () => ({ name: null, roles: ['accountant'], isOwner: false }),
+    })} />)
+    fireEvent.click(screen.getByRole('button', { name: zh['nav.team.toggle'] }))
+
+    expect(screen.getByRole('button', { name: zh['nav.role.accountant'] })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: zh['nav.role.secretary'] })).toBeNull()
+    expect(screen.queryByRole('button', { name: zh['nav.role.legal'] })).toBeNull()
+  })
 })
 
 describe('navActionFace', () => {
@@ -109,11 +146,11 @@ describe('navActionFace', () => {
     return { controller, toggleSidebar, face: (target: WorkbenchNavTarget) => navActionFace(controller, target) }
   }
 
-  /** Read a face's active selector inside a render, as uSES requires. */
-  function probe(useActive: () => boolean): () => boolean {
-    const box = { value: false }
+  /** Read a face's selector inside a render, as uSES requires. */
+  function probe<T>(useHook: () => T): () => T {
+    const box = { value: undefined as T }
     function Probe(): null {
-      box.value = useActive()
+      box.value = useHook()
       return null
     }
     render(<Probe />)
@@ -156,5 +193,12 @@ describe('navActionFace', () => {
 
     act(() => { entry.openTeam() })
     expect(b.controller.pages.getSnapshot().open).toBe('team')
+  })
+
+  it('binds the caller role binding from the workbench snapshot', () => {
+    const b = bench()
+    const my = probe(b.face('members').useMy)
+
+    expect(my()).toEqual({ name: null, roles: [], isOwner: false })
   })
 })

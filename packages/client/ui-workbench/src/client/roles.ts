@@ -6,10 +6,13 @@
  */
 import type { WorkbenchKey } from './locales.ts'
 
+/** Stable role id, shared with the host member-binding contract. */
+export type RoleId = 'secretary' | 'accountant' | 'legal' | 'audit'
+
 /** One role's presentation metadata. */
 export interface RoleMeta {
   /** Stable role id. */
-  id: 'secretary' | 'accountant' | 'legal' | 'audit'
+  id: RoleId
   /** Name substring (data, not copy) a preset needs to assume this role. */
   match: string
   /** Emoji glyph used as the member-card icon placeholder. */

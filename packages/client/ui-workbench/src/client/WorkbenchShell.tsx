@@ -1,9 +1,10 @@
 /**
  * The workbench page surface: one `shell.overlay` entry rendering whichever
  * page the sidebar nav opened — the task hall, the task assistant, the active
- * tasks, the AI team, or the month report — over the whole frame. Closed state
- * renders null, so the overlay layer stays click-through until a page is open.
- * Escape and the header's close control both dismiss.
+ * tasks, the AI team, the month report, or the owner's member management —
+ * over the whole frame. Closed state renders null, so the overlay layer stays
+ * click-through until a page is open. Escape and the header's close control
+ * both dismiss. The members page renders only for the deployment owner.
  */
 import { useEffect, useSyncExternalStore } from 'react'
 import { IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -17,17 +18,21 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import {
   monthReport,
   taskRows,
+  type InviteOutcome,
   type LedgerState,
+  type MembersState,
   type TaskRow,
   type WorkbenchPageId,
   type WorkbenchPagesState,
   type WorkbenchState,
 } from './workbench-store.ts'
 import { AssistantPage } from './pages/AssistantPage.tsx'
+import { MembersPage } from './pages/MembersPage.tsx'
 import { ReportPage } from './pages/ReportPage.tsx'
 import { TaskHallPage } from './pages/TaskHallPage.tsx'
 import { TeamPage } from './pages/TeamPage.tsx'
 import { NS, type WorkbenchKey } from './locales.ts'
+import type { RoleId } from './roles.ts'
 import css from './WorkbenchShell.module.css'
 
 /** Page title keys; each page reuses its nav label. */
@@ -37,6 +42,7 @@ const TITLES: Record<WorkbenchPageId, WorkbenchKey> = {
   active: 'nav.active',
   team: 'nav.team',
   report: 'nav.report',
+  members: 'nav.members',
 }
 
 /** Page subtitle keys. */
@@ -46,6 +52,7 @@ const SUBTITLES: Record<WorkbenchPageId, WorkbenchKey> = {
   active: 'active.subtitle',
   team: 'team.subtitle',
   report: 'report.subtitle',
+  members: 'members.subtitle',
 }
 
 /** Registration-side business face for the page surface. */
@@ -57,6 +64,8 @@ export interface WorkbenchShellInjected {
     workbench: SnapshotStore<WorkbenchState>
     /** Credits-ledger snapshot bound by the renderer as useLedger. */
     ledger: SnapshotStore<LedgerState>
+    /** Member-roster snapshot bound by the renderer as useMembers. */
+    members: SnapshotStore<MembersState>
   }
   /** Hall rows folded from the Session list; stable between list updates. */
   useTasks: () => readonly TaskRow[]
@@ -64,6 +73,8 @@ export interface WorkbenchShellInjected {
   load: () => Promise<void>
   /** Read the bounded ledger. */
   loadLedger: () => Promise<void>
+  /** Read the member roster. */
+  loadMembers: () => Promise<void>
   /** Close the open page. */
   close: () => void
   /** Select a session as current and leave the page. */
@@ -74,6 +85,10 @@ export interface WorkbenchShellInjected {
   assignTask: (presetId: string | undefined, brief: string) => void
   /** Grant points; resolves to the host failure message, or null on success. */
   grantCredits: (amount: number, reason: string) => Promise<string | null>
+  /** Create one member invite. */
+  createInvite: (roles: readonly RoleId[]) => Promise<InviteOutcome>
+  /** Unbind one member's roles; resolves to the host failure message, or null. */
+  unbindMember: (phone: string) => Promise<string | null>
 }
 
 /** Full component props. */
@@ -109,19 +124,22 @@ export function createTaskRowsHook(ctx: ClientContext): () => readonly TaskRow[]
  * @returns the page element tree, or null while no page is open.
  */
 export function WorkbenchShell({
-  usePages, useWorkbench, useLedger, useTasks,
-  load, loadLedger, close, openSession, startWithPreset, assignTask, grantCredits, t,
+  usePages, useWorkbench, useLedger, useMembers, useTasks,
+  load, loadLedger, loadMembers, close, openSession, startWithPreset, assignTask, grantCredits,
+  createInvite, unbindMember, t,
 }: WorkbenchShellProps) {
   const open = usePages(snapshot => snapshot.open)
   const team = useWorkbench(snapshot => snapshot)
   const ledger = useLedger(snapshot => snapshot)
+  const roster = useMembers(snapshot => snapshot)
   const tasks = useTasks()
 
   useEffect(() => {
     if (open === null) return
     void load()
     if (open === 'report') void loadLedger()
-  }, [open, load, loadLedger])
+    if (open === 'members') void loadMembers()
+  }, [open, load, loadLedger, loadMembers])
 
   useEffect(() => {
     if (open === null) return
@@ -140,7 +158,8 @@ export function WorkbenchShell({
       <header className={css.header}>
         <div className={css.heading}>
           <h2 className={css.title}>{t(TITLES[open])}</h2>
-          <p className={css.subtitle}>{t(SUBTITLES[open])}</p>
+          {(open !== 'members' || team.my.isOwner)
+            && <p className={css.subtitle}>{t(SUBTITLES[open])}</p>}
         </div>
         <button type="button" className={css.close} aria-label={t('shell.close')} onClick={() => { close() }}>
           <IconCloseOutline16 size={16} />
@@ -175,6 +194,9 @@ export function WorkbenchShell({
             onGrant={grantCredits}
             t={t}
           />
+        )}
+        {open === 'members' && team.my.isOwner && (
+          <MembersPage members={roster} onCreate={createInvite} onUnbind={unbindMember} t={t} />
         )}
       </div>
     </div>
