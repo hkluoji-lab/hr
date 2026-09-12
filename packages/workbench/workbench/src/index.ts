@@ -12,7 +12,9 @@
  * @module @deepseek-ai/dsh-workbench
  */
 
+import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
+import os from 'node:os'
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
@@ -42,7 +44,7 @@ export { workbenchDomainSpec, MAX_REASON_LENGTH } from './spec.ts'
 export type { CreditEntryRecord, CreditsState } from './spec.ts'
 export type {
   WorkbenchCredits, WorkbenchCreditEntry, WorkbenchCreditGrant, WorkbenchLedger,
-  WorkbenchMember, WorkbenchMemberStatus, WorkbenchSnapshot, WorkbenchTeam,
+  WorkbenchMember, WorkbenchMemberStatus, WorkbenchSnapshot, WorkbenchTeam, WorkbenchUser,
 } from './types.ts'
 
 /** Largest ledger page one read returns; a wire-boundary constant, not a tunable. */
@@ -82,6 +84,8 @@ export class Workbench extends TypertRemoteService {
   private creditsStore: DomainGlobal<CreditsState> | undefined
   /** Append-only grant ledger. */
   private ledger: KvTable<string, CreditEntryRecord> | undefined
+  /** The host account's display name, resolved once at init; absent when the platform cannot report one. */
+  private userName: string | undefined
 
   constructor(ctx: Context, public config: Config) {
     super(ctx, 'workbench')
@@ -94,6 +98,7 @@ export class Workbench extends TypertRemoteService {
     this.ctx.effect(() => () => void this.closeDomain(), 'workbench.domainClose')
     this.creditsStore = domain.global
     this.ledger = domain.table('entries')
+    this.userName = this.resolveUserName()
   }
 
   /** Close the opened domain once, swallowing the fiber's idempotent repeat. */
@@ -111,9 +116,11 @@ export class Workbench extends TypertRemoteService {
    */
   @Remote('snapshot')
   async remoteSnapshot(): Promise<WorkbenchSnapshot> {
+    const userName = this.greetingName()
     return {
       credits: { balance: this.requireCredits().get().balance },
       team: await this.team(),
+      ...userName === undefined ? {} : { user: { name: userName } },
     }
   }
 
@@ -211,6 +218,41 @@ export class Workbench extends TypertRemoteService {
       if (started) ids.add(preset)
     }
     return ids
+  }
+
+  /**
+   * The greeting identity for this snapshot: the most recent web login's
+   * display name when the optional `loginSession` extension has recorded one,
+   * else the host machine account resolved at init. The web-login plugin is a
+   * surface-level row this package does not depend on, so the read is a soft
+   * service lookup at request time — logins after boot are still reflected.
+   * @returns the display name, or undefined when neither source has one.
+   */
+  private greetingName(): string | undefined {
+    const loginSession = Reflect.get(this.ctx, 'loginSession') as { displayName(): string | undefined } | undefined
+    return loginSession?.displayName() ?? this.userName
+  }
+
+  /**
+   * Resolve the host machine account's display name: `id -F` reports the full
+   * name on macOS, and the short account name covers other platforms and any
+   * failure of that optional extension. The greeting is decorative, so the
+   * fallbacks stay silent.
+   * @returns the display name, or undefined when even the account name is unavailable.
+   */
+  private resolveUserName(): string | undefined {
+    try {
+      const full = execFileSync('id', ['-F'], { encoding: 'utf8' }).trim()
+      if (full.length > 0) return full
+    } catch {
+      // `id -F` is a macOS extension; other platforms keep the short account name.
+    }
+    try {
+      return os.userInfo().username
+    } catch {
+      // os.userInfo needs an attached account; the client greets without a name.
+      return undefined
+    }
   }
 
   /** The credits global, or throw when the service is not initialized. */

@@ -44,6 +44,14 @@ export interface WorkbenchSnapshot {
   readonly credits: WorkbenchCredits
   /** Aggregated roster presence. */
   readonly team: WorkbenchTeam
+  /** The greeting identity: the web login's display name when one exists, else the host machine account's. */
+  readonly user?: WorkbenchUser
+}
+
+/** The logged-in account the greeting addresses. */
+export interface WorkbenchUser {
+  /** Display name: the web login's masked phone, else the OS account's full name or short name. */
+  readonly name: string
 }
 
 /** One appended ledger entry as the client reads it. */

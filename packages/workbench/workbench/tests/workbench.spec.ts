@@ -179,6 +179,23 @@ describe('workbench credits', () => {
   })
 })
 
+describe('workbench user read', () => {
+  it('reports the host account display name for the greeting', async () => {
+    const { workbench } = await harness()
+    const { user } = await workbench.remoteSnapshot()
+    // The exact name is the test host's account; the contract is a non-empty name.
+    expect(user?.name.length ?? 0).toBeGreaterThan(0)
+  })
+
+  it('prefers the web login display name over the host account', async () => {
+    const { ctx, workbench } = await harness()
+    // The soft read mirrors composition: web-login provides `loginSession`,
+    // and a login recorded after boot must still reach the next snapshot.
+    ctx.provide('loginSession', { displayName: () => '138****1234' } as never)
+    expect(await workbench.remoteSnapshot().then(s => s.user)).toEqual({ name: '138****1234' })
+  })
+})
+
 describe('workbench ledger read', () => {
   it('serves an empty ledger on a fresh medium', async () => {
     const { workbench } = await harness()

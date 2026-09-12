@@ -36,6 +36,8 @@ dsh --profile web --no-open --port 8080
 
 After startup you see a `dsh web:` line whose root URL carries a fresh process token. Unless `--no-open` or an SSH session suppresses it, the default browser opens that URL, receives a signed cookie, and redirects to the clean root page. You know it worked when the page loads and you can chat with the agent. Two failures to expect: if the frontend is not built, startup stops with a build hint (`pnpm run build` in a checkout); if the browser cannot be opened, a credential-free diagnostic prints to stderr while the server keeps running — open the printed startup URL yourself.
 
+First use passes a sign-in step: a browser without a session cookie is redirected to the login page, where a phone number plus an SMS verification code signs in or registers in one step (WeChat scan sign-in is a coming-soon placeholder). Until an SMS provider is configured, the verification code is printed on the server console under a `[演示]` marker. The printed startup URL keeps working unchanged — its `?token=` exchange takes precedence over the redirect.
+
 ### Configuration
 
 Most users never set these; the command-line flags feed the four settings below — `--host`, `--port`, and `--trusted-host` come from the invocation, and `--no-open` turns the browser handoff off for that invocation:

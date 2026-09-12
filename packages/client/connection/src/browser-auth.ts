@@ -7,6 +7,7 @@ import type {
   ConnectionIndexRequest,
   ConnectionIndexResponse,
   ConnectionTrustRequest,
+  IssuedSessionCookie,
 } from './rpc.ts'
 
 const AUTH_RECORD_KEY = credentialKey('client-connection', 'browser-session')
@@ -14,12 +15,12 @@ const DAY_MILLISECONDS = 24 * 60 * 60 * 1000
 const SECRET_BYTES = 32
 const TOKEN_QUERY = 'token'
 const COOKIE_PREFIX = 'dsh-auth-'
-const COOKIE_PAYLOAD_VERSION = 1
+const LOGIN_PATH = '/login'
+/** Cookie payload versions: v1 is the anonymous token-exchange session, v2 adds the account subject. */
+const COOKIE_PAYLOAD_VERSIONS = [1, 2] as const
 const STORED_SECRET_VERSION = 1
 const BASE64URL_PATTERN = /^[A-Za-z0-9_-]*$/
 const PROCESS_LAUNCH_TOKENS = new WeakMap<object, string>()
-/** Canonical hostnames whose browser sessions may skip launch-token exchange. */
-const LOOPBACK_HOSTNAMES = new Set(['127.0.0.1', 'localhost', '[::1]'])
 
 interface StoredSecretPayload {
   readonly version: typeof STORED_SECRET_VERSION
@@ -27,10 +28,12 @@ interface StoredSecretPayload {
 }
 
 interface BrowserCookiePayload {
-  readonly version: typeof COOKIE_PAYLOAD_VERSION
+  readonly version: (typeof COOKIE_PAYLOAD_VERSIONS)[number]
   readonly authority: string
   readonly issuedAt: number
   readonly expiresAt: number
+  /** Logged-in account identity; present only on version-2 cookies. */
+  readonly subject?: string
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -76,16 +79,6 @@ function requestAuthority(headers: ConnectionTrustRequest['headers']): string | 
     return new URL(`http://${host}`).host
   } catch {
     return undefined
-  }
-}
-
-/** Whether an authority reaches this process over the loopback interface. */
-function isLoopbackAuthority(authority: string | undefined): boolean {
-  if (authority === undefined) return false
-  try {
-    return LOOPBACK_HOSTNAMES.has(new URL(`http://${authority}`).hostname)
-  } catch {
-    return false
   }
 }
 
@@ -140,13 +133,15 @@ function signature(secret: Buffer, body: string): Buffer {
 
 function encodeCookie(payload: BrowserCookiePayload, secret: Buffer): string {
   const body = encodeBase64Url(Buffer.from(JSON.stringify(payload), 'utf8'))
-  return `v1.${body}.${encodeBase64Url(signature(secret, body))}`
+  return `v${String(payload.version)}.${body}.${encodeBase64Url(signature(secret, body))}`
 }
 
 function decodeCookie(value: string, secret: Buffer): BrowserCookiePayload | undefined {
   const parts = value.split('.')
   const [version, body, encodedSignature] = parts
-  if (parts.length !== 3 || version !== 'v1' || body === undefined || encodedSignature === undefined) {
+  const payloadVersion = version === 'v1' ? 1 : version === 'v2' ? 2 : undefined
+  if (parts.length !== 3 || payloadVersion === undefined
+    || body === undefined || encodedSignature === undefined) {
     return undefined
   }
   const actualSignature = decodeBase64Url(encodedSignature)
@@ -163,10 +158,11 @@ function decodeCookie(value: string, secret: Buffer): BrowserCookiePayload | und
     return undefined
   }
   if (!isRecord(decoded)
-    || decoded.version !== COOKIE_PAYLOAD_VERSION
+    || decoded.version !== payloadVersion
     || typeof decoded.authority !== 'string'
     || !Number.isSafeInteger(decoded.issuedAt)
-    || !Number.isSafeInteger(decoded.expiresAt)) return undefined
+    || !Number.isSafeInteger(decoded.expiresAt)
+    || (decoded.subject !== undefined && typeof decoded.subject !== 'string')) return undefined
   return decoded as unknown as BrowserCookiePayload
 }
 
@@ -202,7 +198,6 @@ export class BrowserAuth {
     processOwner: object,
     private readonly secret: Buffer,
     maxAgeDays: number,
-    private readonly trustLoopback: boolean,
   ) {
     this.launchToken = processLaunchToken(processOwner)
     this.maxAgeMilliseconds = maxAgeDays * DAY_MILLISECONDS
@@ -218,16 +213,14 @@ export class BrowserAuth {
    * @param processOwner - root application context retaining one token across Connection reloads.
    * @param credentials - persistent credential provider for the Web profile.
    * @param maxAgeDays - positive absolute browser-cookie lifetime in days.
-   * @param trustLoopback - serve tokenless loopback index requests without a cookie; a `?token=` request still exchanges first.
    * @returns initialized authentication owner with the process owner's launch token.
    */
   static async create(
     processOwner: object,
     credentials: CredentialProvider,
     maxAgeDays: number,
-    trustLoopback = false,
   ): Promise<BrowserAuth> {
-    return new BrowserAuth(processOwner, await initializeSecret(credentials), maxAgeDays, trustLoopback)
+    return new BrowserAuth(processOwner, await initializeSecret(credentials), maxAgeDays)
   }
 
   /**
@@ -247,10 +240,9 @@ export class BrowserAuth {
   /**
    * Authenticate an index request. A valid root query token mints the cookie
    * and redirects to clean `/`; a valid cookie lets the caller serve the
-   * index; every other request receives the same minimal 401 response. The
-   * token exchange keeps precedence over loopback trust: `trustLoopback`
-   * opens tokenless loopback requests, while the printed `?token=` URL still
-   * mints the cookie that every `/api` request requires.
+   * index; every other request redirects to the login page. The token
+   * exchange keeps precedence, so the printed `?token=` URL still mints the
+   * cookie that every `/api` request requires.
    * @param req - incoming root or configured-index request.
    * @param res - response owned when this method returns false.
    * @returns true only when the caller may serve index.html.
@@ -266,7 +258,7 @@ export class BrowserAuth {
         const issuedAt = Date.now()
         const expiresAt = issuedAt + this.maxAgeMilliseconds
         const value = encodeCookie({
-          version: COOKIE_PAYLOAD_VERSION,
+          version: 1,
           authority,
           issuedAt,
           expiresAt,
@@ -291,12 +283,11 @@ export class BrowserAuth {
         res.end()
         return false
       }
-      this.writeUnauthorized(req, res)
+      this.redirectToLogin(req, res)
       return false
     }
-    if (this.trustLoopback && isLoopbackAuthority(requestAuthority(req.headers))) return true
     if (this.isAuthenticated(req)) return true
-    this.writeUnauthorized(req, res)
+    this.redirectToLogin(req, res)
     return false
   }
 
@@ -313,6 +304,70 @@ export class BrowserAuth {
     if (value === undefined) return false
     const payload = decodeCookie(value, this.secret)
     if (payload === undefined || payload.authority !== authority) return false
+    return this.withinLifetime(payload)
+  }
+
+  /**
+   * Mint one authority-bound session cookie, optionally bound to a logged-in
+   * account subject. The caller owns the `Set-Cookie` header.
+   * @param headers - request headers carrying Host; names the cookie.
+   * @param subject - logged-in account identity baked into a version-2 cookie.
+   * @param persistenceMilliseconds - browser-persistence window; omit for the
+   *   configured default. Zero mints a browser-session cookie: `maxAgeSeconds`
+   *   is 0 and the serializer must omit `Max-Age`/`Expires`, while the signed
+   *   payload keeps the default validity so server-side checks are unchanged.
+   * @returns the issued cookie, or undefined when the request names no authority.
+   */
+  mintSessionCookie(
+    headers: ConnectionTrustRequest['headers'],
+    subject?: string,
+    persistenceMilliseconds?: number,
+  ): IssuedSessionCookie | undefined {
+    const authority = requestAuthority(headers)
+    if (authority === undefined) return undefined
+    const issuedAt = Date.now()
+    const expiresAt = issuedAt + this.maxAgeMilliseconds
+    const payload: BrowserCookiePayload = subject === undefined
+      ? { version: 1, authority, issuedAt, expiresAt }
+      : { version: 2, authority, issuedAt, expiresAt, subject }
+    return {
+      name: cookieName(authority),
+      value: encodeCookie(payload, this.secret),
+      maxAgeSeconds: Math.floor((persistenceMilliseconds ?? this.maxAgeMilliseconds) / 1000),
+      expiresAt,
+    }
+  }
+
+  /**
+   * The expired `Set-Cookie` value clearing this authority's session cookie.
+   * @param headers - request headers carrying Host; names the cookie.
+   * @returns the clearing header value, or undefined when the request names no authority.
+   */
+  clearSessionCookie(headers: ConnectionTrustRequest['headers']): string | undefined {
+    const authority = requestAuthority(headers)
+    if (authority === undefined) return undefined
+    return sessionCookie(cookieName(authority), '', 0, 0)
+  }
+
+  /**
+   * Read the logged-in account subject from a valid version-2 cookie.
+   * @param request - request headers carrying Host and Cookie.
+   * @returns the subject, or undefined for anonymous sessions and invalid cookies.
+   */
+  subjectOf(request: ConnectionTrustRequest): string | undefined {
+    const authority = requestAuthority(request.headers)
+    const rawCookie = header(request.headers, 'cookie')
+    if (authority === undefined || rawCookie === undefined) return undefined
+    const value = cookieValue(rawCookie, cookieName(authority))
+    if (value === undefined) return undefined
+    const payload = decodeCookie(value, this.secret)
+    return payload !== undefined && payload.authority === authority && this.withinLifetime(payload)
+      ? payload.subject
+      : undefined
+  }
+
+  /** Whether a decoded payload sits inside the configured lifetime window. */
+  private withinLifetime(payload: BrowserCookiePayload): boolean {
     const now = Date.now()
     return payload.issuedAt <= now
       && payload.expiresAt > now
@@ -320,13 +375,13 @@ export class BrowserAuth {
       && payload.expiresAt - payload.issuedAt <= this.maxAgeMilliseconds
   }
 
-  private writeUnauthorized(req: ConnectionIndexRequest, res: ConnectionIndexResponse): void {
-    res.writeHead(401, {
+  /** Redirect an unauthenticated index request to the login page. */
+  private redirectToLogin(req: ConnectionIndexRequest, res: ConnectionIndexResponse): void {
+    res.writeHead(303, {
       'cache-control': 'no-store',
-      'content-type': 'text/plain; charset=utf-8',
+      'location': LOGIN_PATH,
+      'referrer-policy': 'no-referrer',
     })
-    res.end(req.method === 'HEAD'
-      ? undefined
-      : 'dsh web authentication required; reopen the URL printed by dsh web.\n')
+    res.end(req.method === 'HEAD' ? undefined : '')
   }
 }

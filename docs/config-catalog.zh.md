@@ -363,13 +363,6 @@ export interface ConnectionConfig {
   cookieMaxAgeDays?: number
   /** Maximum buffered JSON body for every `/api` request. Default: 300 MiB. */
   maxRequestBodyBytes?: number
-  /**
-   * Serve the index to any loopback request without the launch token or cookie.
-   * Enables plain `http://127.0.0.1:<port>/` access at the cost of trusting
-   * every local process's browser. The /api trust fence still applies.
-   * Default: false.
-   */
-  trustLoopback?: boolean
 }
 
 /** Timing for generation readiness and automatic reconnection. */
@@ -390,7 +383,7 @@ export interface ConnectionRecoveryConfig {
 }
 ```
 
-来源： [`packages/client/connection/src/index.ts:72`](../packages/client/connection/src/index.ts)
+来源： [`packages/client/connection/src/index.ts:73`](../packages/client/connection/src/index.ts)
 
 <a id="deepseek-aidsh-client-hmr"></a>
 
@@ -3301,6 +3294,28 @@ export interface Config {
 
 来源：[`packages/web/web-fetch-http/src/index.ts:32`](../packages/web/web-fetch-http/src/index.ts)
 
+<a id="deepseek-aidsh-web-login"></a>
+
+## `@deepseek-ai/dsh-web-login`
+
+需要：`webServer` · `connection` · `storageDomain`
+
+```ts config-catalog
+/** Web-login plugin configuration. */
+export interface Config {
+  /** Minimum gap between two sends for one phone, in seconds. */
+  readonly codeCooldownSeconds: number
+  /** How long one code stays verifiable, in seconds. */
+  readonly codeValiditySeconds: number
+  /** Wrong verifications allowed before one challenge is destroyed. */
+  readonly maxVerificationAttempts: number
+  /** How long one member invite stays redeemable, in seconds. */
+  readonly inviteValiditySeconds: number
+}
+```
+
+来源：[`packages/host/web-login/src/index.ts:72`](../packages/host/web-login/src/index.ts)
+
 <a id="deepseek-aidsh-web-search-deepseek"></a>
 
 ## `@deepseek-ai/dsh-web-search-deepseek`
@@ -3415,7 +3430,7 @@ export interface Config {
 }
 ```
 
-来源：[`packages/workbench/workbench/src/index.ts:58`](../packages/workbench/workbench/src/index.ts)
+来源：[`packages/workbench/workbench/src/index.ts:60`](../packages/workbench/workbench/src/index.ts)
 
 <a id="deepseek-aidsh-workflow-worker-thread"></a>
 

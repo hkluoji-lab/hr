@@ -54,7 +54,7 @@ The `workbench` namespace is mounted browser-side through `@deepseek-ai/dsh-api-
 
 | Method | Returns |
 |---|---|
-| `snapshot()` | `{ credits: { balance }, team: { online, busy, offline, members } }` |
+| `snapshot()` | `{ credits: { balance }, team: { online, busy, offline, members }, user? }` — `user` names the greeting identity: the web login's display name when one exists, else the host OS account |
 | `ledger()` | `{ entries: [{ id, amount, reason, at }] }`, newest first, at most `LEDGER_READ_LIMIT` (50) rows |
 | `addCredits(amount, reason)` | `{ balance, entry }` after appending one ledger row and setting the new balance |
 

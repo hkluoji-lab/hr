@@ -54,7 +54,7 @@ kind: "package-reference"
 
 | 方法 | 返回 |
 |---|---|
-| `snapshot()` | `{ credits: { balance }, team: { online, busy, offline, members } }` |
+| `snapshot()` | `{ credits: { balance }, team: { online, busy, offline, members }, user? }`——`user` 是问候语面向的身份：存在 Web 登录时为登录显示名，否则为宿主 OS 账户 |
 | `ledger()` | `{ entries: [{ id, amount, reason, at }] }`，最新在前，最多 `LEDGER_READ_LIMIT`（50）行 |
 | `addCredits(amount, reason)` | 追加一条台账行并设置新余额后返回 `{ balance, entry }` |
 
