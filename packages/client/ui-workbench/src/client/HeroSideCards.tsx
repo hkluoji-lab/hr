@@ -1,18 +1,18 @@
 /**
- * The hero's right-side card stack: bounty credits, AI-team presence, task
- * progress, and deliverables. The app frame only mounts the right column for
- * an open session, so on the blank-session hero this stack is the hero grid's
- * second column on wide viewports and stays hidden on narrow ones. Presence
- * and the credits balance read the shared workbench snapshot; the month-left
- * figure, progress rows, and deliverables are typed placeholders
- * (hero-demo.ts) reproducing the design pending their data seams, and carry a
- * demo-data chip so they never read as live numbers.
+ * The hero's right-side card stack: bounty credits, AI-team presence, and task
+ * progress. The app frame only mounts the right column for an open session, so
+ * on the blank-session hero this stack is the hero grid's second column on
+ * wide viewports and stays hidden on narrow ones. Presence and the credits
+ * balance read the shared workbench snapshot; the month-left figure and
+ * progress rows are typed placeholders (hero-demo.ts) reproducing the design
+ * pending their data seams, and carry a demo-data chip so they never read as
+ * live numbers.
  */
 import type { ReactNode } from 'react'
-import { IconChevronDownOutline14, IconDownloadOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import {
-  DEMO_CREDITS_MONTH_LEFT, DEMO_DELIVERABLE_KEYS, DEMO_PROGRESS,
+  DEMO_CREDITS_MONTH_LEFT, DEMO_PROGRESS,
 } from './hero-demo.ts'
 import type { TeamMemberState, WorkbenchState } from './workbench-store.ts'
 import css from './HeroSideCards.module.css'
@@ -38,7 +38,7 @@ function points(value: number): string {
 }
 
 /**
- * Render the four stacked hero cards.
+ * Render the three stacked hero cards.
  * @param props - the snapshot slice and the translate seat.
  * @returns the hero grid's side-card column.
  */
@@ -99,31 +99,6 @@ export function HeroSideCards({ state, t }: HeroSideCardsProps): ReactNode {
             </div>
           ))}
         </div>
-      </section>
-
-      <section className={css.card} data-workbench-card="deliverables">
-        <div className={css.cardHead}>
-          <span className={css.cardTitle}>{t('right.deliverables.title')}</span>
-          <span className={css.demoChip}>{t('right.credits.demo')}</span>
-        </div>
-        <ul className={css.fileList}>
-          {DEMO_DELIVERABLE_KEYS.map((key) => {
-            const name = t(key)
-            return (
-              <li key={key}>
-                <button
-                  type="button"
-                  className={css.fileRow}
-                  aria-label={t('right.deliverables.download', { name })}
-                  title={name}
-                >
-                  <span className={css.fileName}>{name}</span>
-                  <IconDownloadOutline16 className={css.fileIcon} />
-                </button>
-              </li>
-            )
-          })}
-        </ul>
       </section>
     </aside>
   )

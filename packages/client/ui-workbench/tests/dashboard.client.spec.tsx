@@ -160,21 +160,20 @@ describe('WorkbenchDashboard right-side cards', () => {
     setup({ ...READY, credits: 1280 }, 10)
     expect(screen.getByText('1,280')).toBeTruthy()
     expect(screen.getByText(/87,420/)).toBeTruthy()
-    expect(screen.getAllByText(zh['right.credits.demo']).length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByText(zh['right.credits.demo'])).toBeTruthy()
   })
 
   it('falls back to an em dash and a demo chip while the credits read is null', () => {
     setup({ ...READY, credits: null }, 10)
     expect(screen.getByText('—')).toBeTruthy()
     expect(screen.queryByText('100,000')).toBeNull()
-    expect(screen.getAllByText(zh['right.credits.demo']).length).toBeGreaterThanOrEqual(3)
+    expect(screen.getAllByText(zh['right.credits.demo']).length).toBeGreaterThanOrEqual(2)
   })
 
-  it('lists presence counts, progress rows, and deliverables', () => {
+  it('lists presence counts and progress rows', () => {
     setup(READY, 10)
     // online 2, busy 1, offline 1.
     expect(screen.getByText(zh['right.team.online'])).toBeTruthy()
-    expect(screen.getByText(zh['right.deliverables.file1'])).toBeTruthy()
     expect(screen.getByText('60%')).toBeTruthy()
   })
 })

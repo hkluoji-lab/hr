@@ -1,9 +1,8 @@
 /**
  * Placeholder content for the hero's right-side cards. The bounty balance
  * reads the host credits service when a deployment composes one; the
- * month-left figure, progress rows, and deliverable files have no backing
- * service yet, so they reproduce the design mock as typed placeholders
- * pending that data seam.
+ * month-left figure and progress rows have no backing service yet, so they
+ * reproduce the design mock as typed placeholders pending that data seam.
  */
 import type { WorkbenchKey } from './locales.ts'
 
@@ -23,11 +22,4 @@ export const DEMO_PROGRESS: readonly DemoProgress[] = [
   { labelKey: 'right.progress.secretary', percent: 60 },
   { labelKey: 'right.progress.finance', percent: 30 },
   { labelKey: 'right.progress.legal', percent: 90 },
-]
-
-/** Deliverable file-name locale keys in design order. */
-export const DEMO_DELIVERABLE_KEYS: readonly WorkbenchKey[] = [
-  'right.deliverables.file1',
-  'right.deliverables.file2',
-  'right.deliverables.file3',
 ]
