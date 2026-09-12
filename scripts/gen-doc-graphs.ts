@@ -630,6 +630,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Plain node:http carrier: named-route registry, index transform taps, and the static dist fallback; web-transport plugins register their own routes.',
   },
   {
+    key: 'loginSession',
+    pkg: 'web-login',
+    title: 'Most-recent-login identity holder',
+    mode: 'core',
+    consumers: ['workbench'],
+    note: 'In-memory identity of the most recent login this process life; the durable account stays in the web-login domain, so consumers read it only for display.',
+  },
+  {
     key: 'clientModules',
     pkg: 'client-modules',
     title: 'Client plugin graph host',

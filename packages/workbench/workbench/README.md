@@ -1,5 +1,5 @@
 ---
-description: "Host workbench capability for clients and maintainers composing the persisted credits ledger and the roster-vs-session team-status Remote."
+description: "Host workbench capability for clients and maintainers composing the persisted credits ledger, the client master with its statutory-filing obligation ledger, yearly schedule, signature-delivery follow-up ladder, follow-up center, and the roster-vs-session team-status Remote."
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-This package is the host half of the Web GUI workbench. It persists a credits balance with an append-only grant ledger in a `workbench` storage domain and serves the `workbench` Typert Remote namespace: `snapshot` returns the balance beside an AI-team read model folded from the agent-preset roster and the live session list, `ledger` returns the most recent grants newest-first, and `addCredits` appends one validated grant and advances the balance. Mount it alongside a storage domain, agent presets, and the session store when browser surfaces need one host-owned answer for points and team status.
+This package is the host half of the Web GUI workbench. It persists the credits grant ledger, the secretary-company client master, the statutory-filing obligation ledger, and the signature-delivery ledger in one `workbench` storage domain, and serves the `workbench` Typert Remote namespace: `snapshot` folds an AI-team read model from the preset roster and live sessions, `ledger`/`addCredits` keep the grants, `clients`/`obligations`/`complianceSchedule` answer the client master, its filings, and the year's schedule, `deliveries`/`addDelivery`/`markDelivery`/`removeDelivery` keep the delivery follow-up queue, and `followUps`/`recordFollowUp` fold the chase queue and log reminders. Mount it alongside a storage domain, agent presets, and the session store.
 
 ## Table of Contents
 
@@ -57,8 +57,28 @@ The `workbench` namespace is mounted browser-side through `@deepseek-ai/dsh-api-
 | `snapshot()` | `{ credits: { balance }, team: { online, busy, offline, members }, user? }` — `user` names the greeting identity: the web login's display name when one exists, else the host OS account |
 | `ledger()` | `{ entries: [{ id, amount, reason, at }] }`, newest first, at most `LEDGER_READ_LIMIT` (50) rows |
 | `addCredits(amount, reason)` | `{ balance, entry }` after appending one ledger row and setting the new balance |
+| `clients()` | `{ clients: [{ id, nameCn, nameEn?, brNo?, crNo?, incorporationDate, registeredAddress?, contactEmail?, contactWechat?, contactWhatsapp?, complianceStatus, openObligations, createdAt }] }`, creation order preserved |
+| `addClient(payload)` | `{ client }` after storing one master row; the id is `C-<year>-<serial>` with the serial advancing past every id already stored for that year |
+| `removeClient(id)` | removes the client row and every obligation recorded for it |
+| `obligations()` | `{ obligations: [{ id, clientId, clientNameCn, kind, periodLabel, dueDate, status, createdAt, daysUntilDue, dueTier }] }`, open rows first, each group soonest due first |
+| `addObligation(payload)` | `{ obligation }` after storing one row keyed by random UUID; the client must exist |
+| `markObligation(id, status)` | moves one row between `open` and `submitted` — the SOP's client-submitted closing step |
+| `removeObligation(id)` | removes one obligation row |
+| `complianceSchedule()` | `{ year, rows: [{ clientId, clientNameCn, kind, periodLabel, dueDate, status, source, daysUntilDue, dueTier }] }` — the current year's filing calendar, soonest due first |
+| `deliveries()` | `{ deliveries: [{ id, clientId, clientNameCn, title, channel, status, createdAt, daysSinceSent, followUpTier }] }`, open rows first, each group oldest sent first |
+| `addDelivery(payload)` | `{ delivery }` after storing one row keyed by random UUID, opening in `sent`, sent now; the client must exist |
+| `markDelivery(id, status)` | moves one row along `sent` → `viewed` → `signed` → `returned` — the SOP's view, sign, and returned-archive steps |
+| `removeDelivery(id)` | removes one delivery row |
+| `followUps()` | `{ followUps: [{ id, targetKind, targetId, clientId, clientNameCn, title, tier, suggestedChannel, dueDate?, days, message, reminderCount, lastReminderAt? }] }` — open deliveries in a chase rung and open obligations in a reminder rung folded into one queue, most urgent rung first |
+| `recordFollowUp(payload)` | `{ reminder }` after storing one reminder row keyed by random UUID; the target must exist and be open, and its rung derives from today's date |
 
 A grant accepts only a positive integer amount at or below `maxGrant` and a trimmed reason of 1–200 characters; anything else rejects with `gateway/bad-request` and leaves both stores untouched. The ledger page is bounded because the ledger is append-only and accumulates one row per grant. Team rows mirror the browser dashboard's derivation: a preset is `busy` while a started (non-blank) session projects it, `offline` when discovery reports it broken, and otherwise `online`; broken rows sort last, and `online` counts busy members as reachable.
+
+Client and obligation writes validate at the same wire boundary: `nameCn`, `incorporationDate` (`YYYY-MM-DD`), `kind` (`NAR1`/`AB56`/`PTR`/`ITR`), `periodLabel`, and `dueDate` are required, optional fields are stored when non-empty, and unknown client ids reject with `workbench/client-not-found`; unknown obligation ids reject with `workbench/obligation-not-found`. `daysUntilDue` and `dueTier` derive from today's UTC date, and `dueTier` buckets the reminder ladder the UI renders: `ok` (not due within 30 days), `d30`, `d15`, `d7`, `d1`, then `overdue`. `complianceSchedule` treats stored obligations due in the year as authoritative and adds one projected NAR1 row per client whose incorporation anniversary falls in the year (`source: 'derived'`) — due `NAR1_FILING_WINDOW_DAYS` (31) days after the anniversary — unless an NAR1 obligation for that year is already recorded, so recorded and projected rows never double-remind.
+
+Delivery writes validate at the same boundary: `clientId` and `title` (1–`MAX_DELIVERY_TITLE_LENGTH` (120) characters) are required, `channel` defaults to `email` (`email`/`wechat`/`whatsapp`), and unknown client ids reject with `workbench/client-not-found`; unknown delivery ids reject with `workbench/delivery-not-found`. `daysSinceSent` counts whole days since the send date (UTC), and `followUpTier` buckets the ladder the 催办 workflow acts on: `fresh` before the first rung, `nudge` from `DELIVERY_NUDGE_DAYS` (3) while not yet viewed, `chase` from `DELIVERY_CHASE_DAYS` (7) while not yet signed, `escalate` from `DELIVERY_ESCALATE_DAYS` (14), and `done` once the row closes (`signed`/`returned`).
+
+Follow-up logging validates at the same boundary: `targetKind` (`delivery`/`obligation`) selects the ledger, the target must exist (`workbench/delivery-not-found` / `workbench/obligation-not-found`) and be open (`workbench/follow-up-not-open`), and a target that has not entered its ladder yet rejects with `gateway/bad-request`. The rung re-derives from today's date so the stored record stays truthful. `channel` defaults to the rung's suggestion (`nudge` → `whatsapp`, `chase` → `wechat`, `escalate`/`d30`/`d15`/`overdue` → `email`, `d7`/`d1` → `whatsapp`) and `message` defaults to the host draft for the rung; both accept the secretary's override, with `message` up to `MAX_REMINDER_MESSAGE_LENGTH` (500) characters.
 
 ### Failures and recovery
 
@@ -82,13 +102,13 @@ Two joins that otherwise duplicate across surfaces become one host answer. Credi
 
 | File | Role |
 |---|---|
-| [`src/index.ts`](src/index.ts) | The `Workbench` Remote service: init/open/close, `snapshot`, `ledger`, `addCredits`, the team fold |
-| [`src/spec.ts`](src/spec.ts) | The `workbench` domain spec, persisted-record schemas, and grant length limits |
-| [`src/types.ts`](src/types.ts) | Client-safe snapshot, ledger, member, and grant types |
+| [`src/index.ts`](src/index.ts) | The `Workbench` Remote service: init/open/close, `snapshot`, `ledger`, `addCredits`, the client master and obligation ledger with their schedule fold, the delivery ledger with its follow-up fold, the follow-up center over both ladders, and the team fold |
+| [`src/spec.ts`](src/spec.ts) | The `workbench` domain spec, persisted-record schemas, grant length limits, and the due-date helpers |
+| [`src/types.ts`](src/types.ts) | Client-safe snapshot, ledger, member, grant, client, obligation, schedule, delivery, and follow-up types |
 
 ### Persistence
 
-The domain is versioned (`name: 'workbench'`, version 1) with a per-record layout: one global record `{ balance }` and an `entries` table keyed by random UUID, each row `{ amount, reason, at }`. A grant puts the ledger row first, then replaces the global; both writes queue on the domain chain, so concurrent grants cannot interleave or lose increments.
+The domain is versioned (`name: 'workbench'`, version 1) with a per-record layout: one global record `{ balance }`, an `entries` table keyed by random UUID, each row `{ amount, reason, at }`, a `clients` table keyed by the `C-<year>-<serial>` master id, each row the client fields plus `createdAt` and `complianceStatus`, an `obligations` table keyed by random UUID, each row the filing fields plus `status` and `createdAt`, a `deliveries` table keyed by random UUID, each row the delivery fields plus `createdAt`, and a `reminders` table keyed by random UUID, each row `{ targetKind, targetId, tier, channel, message, createdAt }`. Tables the medium predates read as empty, so old media load unchanged. A grant puts the ledger row first, then replaces the global; both writes queue on the domain chain, so concurrent grants cannot interleave or lose increments.
 
 </details>
 
@@ -131,7 +151,7 @@ These limits define what the service answers. They are current package constrain
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-None.
+The client master, the filing ledger, and the year's schedule fold are recorded in the [clients & filings Agent Note](../../../.agents/notes/implemented/feature/2026-09-12-workbench-clients-filings.md). The delivery ledger and its follow-up ladder are recorded in the [deliveries Agent Note](../../../.agents/notes/implemented/feature/2026-09-12-workbench-deliveries-followup.md). The follow-up center over both ladders is recorded in the [follow-up center Agent Note](../../../.agents/notes/implemented/feature/2026-09-12-workbench-follow-up-center.md).
 
 </details>
 

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -94,12 +94,14 @@ describe('DeepSeek plugin package inventory', () => {
     })
   })
 
-  it('fails request preparation for an active package with malformed identity metadata', async () => {
+  it('omits an active package with malformed identity metadata instead of failing the request', async () => {
     const { ctx, root } = await harness()
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
     const bad = await packagePlugin(root, 'bad', { name: 'bad' })
     await ctx.loader.create({ name: bad })
     await expect(ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL }))
-      .rejects.toThrow(/must declare non-empty name and version/)
+      .resolves.toMatchObject({ fields: { dsh_plugin_packages: { version: 1, packages: [] } } })
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('must declare non-empty name and version'))
   })
 
   it('omits a loose ESM module whose nearest manifest only marks the module type', async () => {
@@ -158,15 +160,45 @@ describe('DeepSeek plugin package inventory', () => {
     ])
   })
 
-  it('fails when a Loader-resolved bare entry has no package manifest', async () => {
+  it('omits a Loader-resolved bare entry with no package manifest instead of failing the request', async () => {
     const { ctx } = await harness()
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
     ctx.loader.internal = {
       version: 'v2',
       import: async () => ({ default: () => {} }),
     } as unknown as NonNullable<typeof ctx.loader.internal>
     await ctx.loader.create({ name: 'missing-package' })
     await expect(ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL }))
-      .rejects.toThrow(/cannot resolve active package/)
+      .resolves.toMatchObject({ fields: { dsh_plugin_packages: { version: 1, packages: [] } } })
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('cannot resolve active package'))
+  })
+
+  it('keeps the resolvable rows when a sibling entry cannot be resolved', async () => {
+    const { ctx, root } = await harness()
+    vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    const good = await packagePlugin(root, 'node_modules/good-package', { name: 'good-package', version: '1.0.0' })
+    ctx.loader.internal = {
+      version: 'v2',
+      import: async () => ({ default: () => {} }),
+    } as unknown as NonNullable<typeof ctx.loader.internal>
+    await ctx.loader.create({ name: good })
+    await ctx.loader.create({ name: 'missing-package' })
+
+    const prepared = await ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL })
+    expect(prepared.fields.dsh_plugin_packages?.packages).toEqual([{ name: 'good-package', version: '1.0.0' }])
+  })
+
+  it('reports an empty package list when collection itself fails', async () => {
+    const { ctx } = await harness()
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    const id = SessionId('boom-agent')
+    const agentScope = createScope(ctx, {})
+    ctx.agents.register({ id, ctx: agentScope.ctx, session: { id } } as unknown as Agent)
+    vi.spyOn(ctx.agents, 'get').mockImplementation(() => { throw new Error('inventory walk exploded') })
+
+    await expect(ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL, sessionId: id }))
+      .resolves.toMatchObject({ fields: { dsh_plugin_packages: { version: 1, packages: [] } } })
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('inventory collection failed'))
   })
 
   it('supports a direct embedding whose context has no base URL', async () => {

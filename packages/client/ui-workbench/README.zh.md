@@ -1,5 +1,5 @@
 ---
-description: "Web 工作台各表面：空白会话 hero 仪表盘（问候、快捷动作、积分、Agent 预设团队名册）、打开全帧页面的五个侧栏导航入口（任务大厅、智能任务助手、活跃任务、AI 团队、项目）加 owner 专属的成员管理入口，以及右栏中会话作用域的交付物、子任务进度、赏金额度与 AI 团队状态 tab；供工作台各表面的用户与维护者阅读。"
+description: "Web 工作台各表面：空白会话 hero 仪表盘（问候、快捷动作、积分、Agent 预设团队名册）、打开全帧页面的六个侧栏导航入口（任务大厅、智能任务助手、活跃任务、客户与申报、AI 团队、项目）加 owner 专属的成员管理入口，以及右栏中会话作用域的交付物、子任务进度、赏金额度与 AI 团队状态 tab；供工作台各表面的用户与维护者阅读。"
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-本包渲染 Web GUI 上的工作台：空白会话 hero 仪表盘（问候语、在线团队副标题、四个快捷动作、Agent 预设团队成员卡）与五个 `sidebar.nav` 导航入口——任务大厅、智能任务助手、活跃任务、AI 团队、项目。名册数据来自一次 `agentPresets.list` 读取；四个入口打开 `shell.overlay` 全帧页面，项目展开工作区浏览器。工作台读取 `/auth/status` 并把名册收窄到调用者的绑定角色；owner 获得专属「成员管理」页（邀请码、名册、解绑）。会话作用域的右栏 tab 提供交付物、进度、赏金额度与 AI 团队状态。
+本包渲染 Web GUI 上的工作台：空白会话 hero 仪表盘（问候语、在线团队副标题、四个快捷动作、Agent 预设团队成员卡）与六个 `sidebar.nav` 导航入口——任务大厅、智能任务助手、活跃任务、客户与申报、AI 团队、项目。名册数据来自一次 `agentPresets.list` 读取；五个入口打开 `shell.overlay` 全帧页面，项目展开工作区浏览器。工作台读取 `/auth/status` 并把名册收窄到调用者的绑定角色；owner 获得专属「成员管理」页（邀请码、名册、解绑）。会话作用域的右栏 tab 提供交付物、进度、赏金额度与 AI 团队状态。
 
 ## 目录
 
@@ -27,11 +27,11 @@ kind: "package-reference"
 
 与运行时一起挂载本插件；没有当前会话时，hero 会在标题区与工作区行之间显示仪表盘。「新建任务」以部署默认组合开启新会话，「查看项目」展开侧栏的工作区浏览器，每张团队成员卡则以该成员的预设组合开启会话。损坏的预设渲染为离线且不可点击。宿主 workbench 服务存在时，副标题显示积分余额。
 
-侧栏主导航在新会话按钮正下方新增五个入口，不替换任何侧栏区域；宽栏下渲染为带文字的行，rail 折叠态下渲染为 36px 带 Tooltip 的控件。**任务大厅**列出全部已启动会话——标题、运行它的预设、生命周期与最近更新时间——点击行即选中该会话。**智能任务助手**是任务描述表单：写下任务、可选地指派公司的角色成员之一（或留给默认团队），提交后开启该会话并把描述作为它的首条用户消息。打开 **AI 团队协作**开关后选择器被替换：任务交给 AI 秘书，首条消息前拼上编排模板，由秘书用 workflow 编排——分诊、并行派发会计/法务/审计子代理、审计复核、返回 JSON 汇总——各子代理以 label 显示在进度 tab 中。**活跃任务**是只保留运行中会话的大厅。**AI 团队**以页面尺度渲染公司角色名册——与 hero 团队区相同的卡片，模式等非角色预设不会出现在公司团队中——点击卡片以该成员的预设开启会话；其导航条目还会在原位展开四个角色组——AI 秘书、AI 会计、AI 法务、AI 审计——每个角色组列出该角色的能力子项（AI-客服、AI-合同……），点击子项即打开团队页。**项目**展开工作区浏览器。前四项打开覆盖应用整帧的页面，再次点击当前项（或页面的关闭控件，或 Escape）即关闭。**本月报告**从 hero 的快捷动作打开，并列展示本自然月的任务统计、积分余额、发放表单与最近明细。
+侧栏主导航在新会话按钮正下方新增六个入口，不替换任何侧栏区域；宽栏下渲染为带文字的行，rail 折叠态下渲染为 36px 带 Tooltip 的控件。**任务大厅**列出全部已启动会话——标题、运行它的预设、生命周期与最近更新时间——点击行即选中该会话。**智能任务助手**是任务描述表单：写下任务、可选地指派公司的角色成员之一（或留给默认团队），提交后开启该会话并把描述作为它的首条用户消息。打开 **AI 团队协作**开关后选择器被替换：任务交给 AI 秘书，首条消息前拼上编排模板，由秘书用 workflow 编排——分诊、并行派发会计/法务/审计子代理、审计复核、返回 JSON 汇总——各子代理以 label 显示在进度 tab 中。**活跃任务**是只保留运行中会话的大厅。**客户与申报**是阶段一秘书公司 SOP 的落地面：客户主档（录入客户及其成立日期、注册证号与联系方式）、法定申报义务台账（登记 NAR1/AB56/PTR/ITR 义务的所属期间与截止日期，标记已申报、重开或删除）、本年申报排期——已登记义务加上每个成立周年日尚无登记申报的客户的推算 NAR1 行，每行带催办阶梯徽章——文件签转台账：登记按邮件/微信/WhatsApp 发给客户的文件包，沿生命周期推进（已查看 → 已签署 → 已回收），并读取催办工作流依据的催办阶梯（`nudge` T+3 / `chase` T+7 / `escalate` T+14）——以及催办中心：一条催办队列，把进入催办档位的 open 签转行与进入提醒档位（d30/d15/d7/d1/overdue）的 open 义务行折叠在一起，最紧急档位在前，每行展示目标事实、档位徽章、host 话术稿（可改写）、该档位的建议渠道（可切换）与已登记的催办次数，并带一个在宿主登记提醒的动作。**AI 团队**以页面尺度渲染公司角色名册——与 hero 团队区相同的卡片，模式等非角色预设不会出现在公司团队中——点击卡片以该成员的预设开启会话；其导航条目还会在原位展开四个角色组——AI 秘书、AI 会计、AI 法务、AI 审计——每个角色组列出该角色的能力子项（AI-客服、AI-合同……），点击子项即打开团队页。**项目**展开工作区浏览器。前五项打开覆盖应用整帧的页面，再次点击当前项（或页面的关闭控件，或 Escape）即关闭。**本月报告**从 hero 的快捷动作打开，并列展示本自然月的任务统计、积分余额、发放表单与最近明细。
 
 hero 上的「调用 AI 团队」与「本月报告」会打开同样的团队页与报告页。
 
-工作台按调用者的成员绑定自我收窄，绑定来自登录面 `/auth/status` 的 `{name, roles, isOwner}`。问候语追加绑定角色（`greeting.roles`），名册、智能任务助手的成员选择器与团队页都过滤为调用者的角色加无角色预设——owner 与未绑定访客看全量名册，因此未绑定部署的渲染与从前完全一致。owner 额外获得一个**成员管理**导航入口，打开全帧页面：勾选岗位铸造一次性邀请码（附过期时间）、读取带授予元数据的名册、解绑成员；该入口仅对 owner 渲染。
+工作台按调用者的成员绑定自我收窄，绑定来自登录面 `/auth/status` 的 `{name, roles, isOwner}`。问候语追加绑定角色（`greeting.roles`），名册、智能任务助手的成员选择器与团队页都过滤为调用者的角色加无角色预设——owner 与未绑定访客看全量名册，因此未绑定部署的渲染与从前完全一致。owner 额外获得一个**成员管理**导航入口，打开全帧页面：勾选岗位铸造一次性邀请码（附过期时间）、读取带授予元数据的名册、解绑成员、删除已注册账号——账号列表同时覆盖从未绑定岗位的手机号，owner 本人账号则不渲染删除控件；该入口仅对 owner 渲染。
 
 会话打开时，右栏会新增四个 builtin 页面型 tab，四者同时出现在 guide 页。**交付物**列出本会话成功的 `write`、`edit` 与变更类 `str_replace_editor` 调用产出的全部文件，按首次出现顺序去重；点击行通过 Sidebar 的资源地址打开文件。**进度**按会话存储顺序列出本会话的子任务成员，带「进行中/已结束」状态点；点击行打开对应子会话。**赏金额度**展示本部署的积分余额与近期发放明细。**AI 团队状态**统计公司角色成员的在线、工作中与离线数量，再逐个列出角色成员及其状态点。无可展示内容的 tab 只渲染一条空状态、读取中或读取失败的提示。
 
@@ -47,9 +47,9 @@ hero 上的「调用 AI 团队」与「本月报告」会打开同样的团队�
 <details>
 <summary>实现细节——点击展开</summary>
 
-单个 `WorkbenchController` 支撑全部表面，因此导航入口与 hero 快捷方式驱动同一份页面状态。它持有三个快照 store：团队/积分仪表盘、当前打开页面的 id、积分明细。`load()` 发一次 `agentPresets.list`（与其他预设表面一样把 `gateway/invocation-unavailable` 视为空名册），折叠会话列表把有非空白会话的预设标记为「工作中」，损坏预设排到末尾作为「离线」。`startWithPreset(id)` 复刻 hero 预设芯片：先 stage id，调用 `uiWorkspace.startSession()`，下一次会话列表变化时对新的空白会话应用 `agentPresets.select`——宿主拒绝为非空白会话换组合。`assignTask(presetId, brief)` 走同一次开启流程，并在绑定出现后把描述作为该会话的首条用户消息提交。`load()` 还同源探测一次 `/auth/status`（失败静默降级为未绑定访客形态），`scopedRoles`/`scopedMembers` 在任何表面读取之前按该绑定过滤角色词表与预设名册。
+单个 `WorkbenchController` 支撑全部表面，因此导航入口与 hero 快捷方式驱动同一份页面状态。它持有四个快照 store：团队/积分仪表盘、当前打开页面的 id、积分明细、客户与申报页（主档行、义务行、排期、签转行与催办队列）。`load()` 发一次 `agentPresets.list`（与其他预设表面一样把 `gateway/invocation-unavailable` 视为空名册），折叠会话列表把有非空白会话的预设标记为「工作中」，损坏预设排到末尾作为「离线」。`startWithPreset(id)` 复刻 hero 预设芯片：先 stage id，调用 `uiWorkspace.startSession()`，下一次会话列表变化时对新的空白会话应用 `agentPresets.select`——宿主拒绝为非空白会话换组合。`assignTask(presetId, brief)` 走同一次开启流程，并在绑定出现后把描述作为该会话的首条用户消息提交。`loadClients()` 发出客户页读取的五连——`workbench.clients`、`workbench.obligations`、`workbench.complianceSchedule`、`workbench.deliveries`、`workbench.followUps`——停进同一个快照；页面只在本地做字段级校验，并把宿主的 wire 错误码映射为友好文案。`load()` 还同源探测一次 `/auth/status`（失败静默降级为未绑定访客形态），`scopedRoles`/`scopedMembers` 在任何表面读取之前按该绑定过滤角色词表与预设名册。
 
-hero 向 `conversation.hero.dashboard` 列表槽位（由 ui-conversation 声明，scope 为 `root`）贡献一个条目。六个条目占用 `sidebar.nav` 列表槽位（由 ui-sidebar 声明，scope 为 `root`），因此无需改动侧栏外壳代码：`navActionFace(controller, target)` 把页面目标绑为 `controller.togglePage` 并从打开页面 store 派生活动态，把项目绑为 `controller.viewProjects()`，即展开侧栏工作区浏览器，并把 `openTeam` 绑为 `controller.openPage('team')` 供团队条目的能力子项使用。团队条目内联渲染 `ROLES` 角色组；展开状态是该行的组件本地状态（默认全部折叠，使导航座位保持足够矮、无需滚动即可到达设置项，每个箭头按需展开），子项永远不会变成槽位条目。成员管理条目在渲染时绑定 `useMy`，非 owner 一律渲染 null，槽位注册保持静态而可见性跟随绑定。页面表面是 `shell.overlay` 列表槽位（由 ui-layout 声明，scope 为 `root`）中的一个条目；`WorkbenchShell` 在没有页面打开时渲染 null，保持 overlay 层可点击穿透，并分发到大厅、助手、活跃任务、团队、成员或报告页。大厅折叠会话列表（跳过空白与子任务会话），其 hook 按列表快照缓存，使 `useSyncExternalStore` 始终看到稳定引用。成员管理页通过控制器探测 `/auth/status` 所用的同一 fetcher 驱动登录面发布的 `/team` 路由——创建邀请、列成员、解绑。
+hero 向 `conversation.hero.dashboard` 列表槽位（由 ui-conversation 声明，scope 为 `root`）贡献一个条目。七个条目占用 `sidebar.nav` 列表槽位（由 ui-sidebar 声明，scope 为 `root`），因此无需改动侧栏外壳代码：`navActionFace(controller, target)` 把页面目标绑为 `controller.togglePage` 并从打开页面 store 派生活动态，把项目绑为 `controller.viewProjects()`，即展开侧栏工作区浏览器，并把 `openTeam` 绑为 `controller.openPage('team')` 供团队条目的能力子项使用。团队条目内联渲染 `ROLES` 角色组；展开状态是该行的组件本地状态（默认全部折叠，使导航座位保持足够矮、无需滚动即可到达设置项，每个箭头按需展开），子项永远不会变成槽位条目。成员管理条目在渲染时绑定 `useMy`，非 owner 一律渲染 null，槽位注册保持静态而可见性跟随绑定。页面表面是 `shell.overlay` 列表槽位（由 ui-layout 声明，scope 为 `root`）中的一个条目；`WorkbenchShell` 在没有页面打开时渲染 null，保持 overlay 层可点击穿透，并分发到大厅、助手、活跃任务、客户与申报、团队、成员或报告页。大厅折叠会话列表（跳过空白与子任务会话），其 hook 按列表快照缓存，使 `useSyncExternalStore` 始终看到稳定引用。成员管理页通过控制器探测 `/auth/status` 所用的同一 fetcher 驱动登录面发布的 `/team` 路由——创建邀请、列成员、解绑、列账号、删除账号；名册与账号列表同属一个快照，一并读取，因此单一状态即可报告任一失败。
 
 报告页通过宿主 workbench 的 `ledger` Remote 读取有界明细，通过 `addCredits` 发放，并以宿主自身的返回刷新余额与明细。`monthReport` 用同一批大厅行与明细条目统计本地自然月。
 
@@ -96,6 +96,7 @@ hero 向 `conversation.hero.dashboard` 列表槽位（由 ui-conversation 声明
 - **本月报告只读有界明细**——超出宿主读取上限的发放不会计入，且统计仅覆盖本地自然月。
 - **tab 是会话视图，不是跨会话报表**——交付物只折叠当前打开会话已加载的事件窗口（窗口内去重），且四个 tab 都只在选中会话时挂载。
 - **工作区隔离在客户端侧**——角色绑定过滤渲染出的名册、选择器与团队视图，并守住登录面的管理路由；任务与会话数据不按角色在服务端隔离。
+- **客户主档是部署级记账**——一份共享的主档、申报台账、签转台账与提醒记录；行不带按成员的归属、修订历史或审计线索，推算的 NAR1 排期行在申报被登记之前只是提示信息，阶梯档位在每次读取时按发出/截止日期重算——已登记的催办只是队列行上的注记，既不冻结行的档位，也不会真正发出任何消息。
 
 <a id="dev-note"></a>
 ### 开发备注
@@ -103,7 +104,7 @@ hero 向 `conversation.hero.dashboard` 列表槽位（由 ui-conversation 声明
 <details>
 <summary>维护者的工作上下文——点击展开</summary>
 
-成员绑定——`/auth/status` 读取、名册收窄与 owner 专属成员管理页——记录在[团队成员角色 Agent Note](../../../.agents/notes/implemented/feature/2026-09-12-web-team-member-roles.zh.md)。
+成员绑定——`/auth/status` 读取、名册收窄与 owner 专属成员管理页——记录在[团队成员角色 Agent Note](../../../.agents/notes/implemented/feature/2026-09-12-web-team-member-roles.zh.md)。客户与申报页——host 快照三连与其页面约定——记录在[客户主档与申报台账 Agent Note](../../../.agents/notes/implemented/feature/2026-09-12-workbench-clients-filings.zh.md)。文件签转台账区记录在[文件签转与催办 Agent Note](../../../.agents/notes/implemented/feature/2026-09-12-workbench-deliveries-followup.zh.md)。催办中心区记录在[催办中心 Agent Note](../../../.agents/notes/implemented/feature/2026-09-12-workbench-follow-up-center.zh.md)。
 
 </details>
 

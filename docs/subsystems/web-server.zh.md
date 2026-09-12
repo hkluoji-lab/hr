@@ -60,6 +60,34 @@ interface Config {
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
+<a id="ctxloginsession--loginsession"></a>
+
+### `ctx.loginSession` — `LoginSession`
+
+Most-recent-login holder provided as `ctx.loginSession`.
+
+```ts cordis-catalog
+/**
+ * Record one successful login, replacing any previous identity.
+ * @param identity - the phone and masked display name of the login.
+ */
+record(identity: LoginIdentity): void
+
+/**
+ * The display name of the most recent login this process life.
+ * @returns the display name, or undefined before the first login.
+ */
+displayName(): string | undefined
+
+/**
+ * The phone of the most recent login this process life.
+ * @returns the phone, or undefined before the first login.
+ */
+phone(): string | undefined
+```
+
+Source: [`packages/host/web-login/src/session.ts`](../../packages/host/web-login/src/session.ts)
+
 <a id="ctxwebserver--webserver"></a>
 
 ### `ctx.webServer` — `WebServer`

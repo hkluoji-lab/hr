@@ -1690,7 +1690,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/llm/plugin-package-inventory-deepseek/src/index.ts:31`](../packages/llm/plugin-package-inventory-deepseek/src/index.ts)
+Source: [`packages/llm/plugin-package-inventory-deepseek/src/index.ts:38`](../packages/llm/plugin-package-inventory-deepseek/src/index.ts)
 
 <a id="deepseek-aidsh-pwsh-local"></a>
 
@@ -3307,12 +3307,18 @@ export interface Config {
   readonly codeValiditySeconds: number
   /** Wrong verifications allowed before one challenge is destroyed. */
   readonly maxVerificationAttempts: number
+  /**
+   * Whether `POST /auth/register` demands an SMS code beside the password.
+   * False creates the account from a phone and a password alone, so a
+   * deployment with no SMS provider can still register accounts.
+   */
+  readonly requireRegistrationCode: boolean
   /** How long one member invite stays redeemable, in seconds. */
   readonly inviteValiditySeconds: number
 }
 ```
 
-Source: [`packages/host/web-login/src/index.ts:72`](../packages/host/web-login/src/index.ts)
+Source: [`packages/host/web-login/src/index.ts:83`](../packages/host/web-login/src/index.ts)
 
 <a id="deepseek-aidsh-web-search-deepseek"></a>
 
@@ -3428,7 +3434,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/workbench/workbench/src/index.ts:60`](../packages/workbench/workbench/src/index.ts)
+Source: [`packages/workbench/workbench/src/index.ts:141`](../packages/workbench/workbench/src/index.ts)
 
 <a id="deepseek-aidsh-workflow-worker-thread"></a>
 

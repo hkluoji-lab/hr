@@ -2,6 +2,13 @@
  * Active Loader-backed plugin package inventory for official DeepSeek requests.
  * Host entries and the requesting agent's standing preset are resolved at request time;
  * installed dependencies and plugin fibers without Loader package provenance are excluded.
+ *
+ * This contribution is request telemetry, so it never fails a request: an entry
+ * that cannot be resolved to a package identity is dropped with a warning and
+ * the remaining rows still ship. The alternative — throwing out of the
+ * request-extension hook — turns one unresolvable row into a dead LLM request
+ * path for the whole deployment (observed when a package is removed from disk
+ * while a host that already mounted it keeps running).
  * @module @deepseek-ai/dsh-plugin-package-inventory-deepseek
  */
 
@@ -99,7 +106,14 @@ class PackageIdentityResolver {
   // TODO: Invalidate manifest identities if in-process package-version replacement becomes a supported upgrade path.
   private readonly cache = new Map<string, DeepSeekPluginPackageIdentity | undefined>()
 
-  constructor(private readonly hostBaseUrl: string) {}
+  constructor(
+    private readonly hostBaseUrl: string,
+    /**
+     * Sink for rows this resolver drops. Reporting through a logger rather than
+     * throwing keeps a single unresolvable entry from costing the request.
+     */
+    private readonly warn: (message: string) => void,
+  ) {}
 
   /** Resolve one Loader entry's owning package, or absence for a non-package loose module. */
   resolve({ entry, bareBaseUrl }: ActiveEntry): DeepSeekPluginPackageIdentity | undefined {
@@ -114,7 +128,12 @@ class PackageIdentityResolver {
     if (packageName !== undefined) {
       manifest = barePackageManifest(packageName, anchors)
       if (manifest === undefined) {
-        throw new Error(`plugin-package-inventory-deepseek: cannot resolve active package ${JSON.stringify(packageName)}`)
+        // A live Loader entry whose package is gone from disk — most often a
+        // package removed without a host restart. Drop this row and keep going:
+        // failing here would take down every request over one telemetry field.
+        this.warn(`cannot resolve active package ${JSON.stringify(packageName)}; omitting it from dsh_plugin_packages`)
+        this.cache.set(key, undefined)
+        return undefined
       }
     } else if (!entry.options.name.startsWith('cordis:')) {
       const moduleUrl = isAbsolute(entry.options.name)
@@ -122,7 +141,17 @@ class PackageIdentityResolver {
         : new URL(entry.options.name, treeBase)
       if (moduleUrl.protocol === 'file:') manifest = nearestManifest(fileURLToPath(moduleUrl))
     }
-    const identity = manifest === undefined ? undefined : identityFromManifest(manifest, packageName === undefined)
+    let identity: DeepSeekPluginPackageIdentity | undefined
+    if (manifest !== undefined) {
+      try {
+        identity = identityFromManifest(manifest, packageName === undefined)
+      } catch (error: unknown) {
+        // Same rule as the missing-manifest branch: a malformed identity costs
+        // this package its row, not the request its life.
+        this.warn(`ignoring ${manifest}: ${error instanceof Error ? error.message : String(error)}`)
+        identity = undefined
+      }
+    }
     this.cache.set(key, identity)
     return identity
   }
@@ -180,19 +209,35 @@ async function collectActivePluginPackages(
 
 /**
  * Register the complete `dsh_plugin_packages` request contribution when enabled.
+ *
+ * Every failure inside the contribution degrades to a warning plus a partial
+ * (possibly empty) package list. The field is telemetry: shipping fewer rows is
+ * always cheaper than failing the request that carries them.
  * @param ctx - plugin context carrying Loader provenance and the DeepSeek request-extension registry.
  * @param config - validated default-on configuration.
  */
 export function apply(ctx: Context, config: Config): void {
   if (config.enabled === false) return
   const hostBaseUrl = ctx.baseUrl ?? import.meta.url
-  const resolver = new PackageIdentityResolver(hostBaseUrl)
+  const warn = (message: string): void => {
+    ctx.logger.warn(`plugin-package-inventory-deepseek: ${message}`)
+  }
+  const resolver = new PackageIdentityResolver(hostBaseUrl, warn)
   ctx.deepseekLlmApiExtensions.register('dsh_plugin_packages', {
     prepare: async (request) => {
-      const value: DeepSeekPluginPackageInventoryExtension = {
-        version: 1,
-        packages: await collectActivePluginPackages(ctx, resolver, hostBaseUrl, request.sessionId),
+      let packages: readonly DeepSeekPluginPackageIdentity[] = []
+      try {
+        packages = await collectActivePluginPackages(ctx, resolver, hostBaseUrl, request.sessionId)
+      } catch (error: unknown) {
+        // Belt and braces around the whole walk: an unexpected failure anywhere
+        // below still yields a valid (empty) contribution instead of a dead
+        // request-extension hook.
+        warn(
+          'inventory collection failed; reporting an empty package list: '
+          + (error instanceof Error ? error.message : String(error)),
+        )
       }
+      const value: DeepSeekPluginPackageInventoryExtension = { version: 1, packages }
       return { value }
     },
   })

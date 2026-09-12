@@ -215,7 +215,7 @@ export interface Config {
 }
 ```
 
-来源：[`packages/api/session-controller/src/index.ts:69`](../packages/api/session-controller/src/index.ts)
+来源：[`packages/api/session-controller/src/index.ts:70`](../packages/api/session-controller/src/index.ts)
 
 <a id="deepseek-aidsh-api-settings-controller"></a>
 
@@ -1692,7 +1692,7 @@ export interface Config {
 }
 ```
 
-来源：[`packages/llm/plugin-package-inventory-deepseek/src/index.ts:31`](../packages/llm/plugin-package-inventory-deepseek/src/index.ts)
+来源：[`packages/llm/plugin-package-inventory-deepseek/src/index.ts:38`](../packages/llm/plugin-package-inventory-deepseek/src/index.ts)
 
 <a id="deepseek-aidsh-pwsh-local"></a>
 
@@ -2675,7 +2675,7 @@ export interface Config {
 }
 ```
 
-来源：[`packages/context/time-context/src/index.ts:48`](../packages/context/time-context/src/index.ts)
+来源：[`packages/context/time-context/src/index.ts:49`](../packages/context/time-context/src/index.ts)
 
 <a id="deepseek-aidsh-tmux-context"></a>
 
@@ -3220,7 +3220,7 @@ export interface Config {
 export type ApprovalPolicy = 'ask' | 'never'
 ```
 
-来源：[`packages/interaction/user-approval/src/index.ts:126`](../packages/interaction/user-approval/src/index.ts)
+来源：[`packages/interaction/user-approval/src/index.ts:127`](../packages/interaction/user-approval/src/index.ts)
 
 <a id="deepseek-aidsh-web"></a>
 
@@ -3309,12 +3309,18 @@ export interface Config {
   readonly codeValiditySeconds: number
   /** Wrong verifications allowed before one challenge is destroyed. */
   readonly maxVerificationAttempts: number
+  /**
+   * Whether `POST /auth/register` demands an SMS code beside the password.
+   * False creates the account from a phone and a password alone, so a
+   * deployment with no SMS provider can still register accounts.
+   */
+  readonly requireRegistrationCode: boolean
   /** How long one member invite stays redeemable, in seconds. */
   readonly inviteValiditySeconds: number
 }
 ```
 
-来源：[`packages/host/web-login/src/index.ts:72`](../packages/host/web-login/src/index.ts)
+来源：[`packages/host/web-login/src/index.ts:83`](../packages/host/web-login/src/index.ts)
 
 <a id="deepseek-aidsh-web-search-deepseek"></a>
 
@@ -3430,7 +3436,7 @@ export interface Config {
 }
 ```
 
-来源：[`packages/workbench/workbench/src/index.ts:60`](../packages/workbench/workbench/src/index.ts)
+来源：[`packages/workbench/workbench/src/index.ts:141`](../packages/workbench/workbench/src/index.ts)
 
 <a id="deepseek-aidsh-workflow-worker-thread"></a>
 
