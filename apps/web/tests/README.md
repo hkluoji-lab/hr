@@ -41,3 +41,15 @@ scenarios mirror `conversationContextKey` in `support.ts` instead of importing
 its Client owner.
 
 Nothing mechanically enforces this rule; keep it in review.
+
+## Live-server smoke test (manual)
+
+[`manual/live-server-smoke.py`](manual/live-server-smoke.py) is an owner-local
+smoke test for the **workbench** surface that a stock `dsh web` deployment does
+not compose here: it drives a running server (default `http://127.0.0.1:3080`)
+over real HTTP — authentication, the hero dashboard, every sidebar surface, and
+the member/account management round trip. It is not part of this lane: it needs
+the live server, the web-login demo SMS log, and demo accounts. Run it with
+`python3 apps/web/tests/manual/live-server-smoke.py`; server address, SMS log
+path, and account numbers are overridable via `WEB_BASE`, `WEB_SMS_LOG`,
+`WEB_OWNER`, `WEB_DEMO_USER`, `WEB_DEMO_PASS`, and `WEB_NEW_PHONE`.

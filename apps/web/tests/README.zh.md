@@ -33,3 +33,14 @@ harness 的用途，且这两个包本来就在 Host 图中。chat 场景则在 
 `conversationContextKey`，而不 import 其 Client owner。
 
 没有任何机制强制这条规则；靠 review 守住它。
+
+## 实机冒烟测试（手动）
+
+[`manual/live-server-smoke.py`](manual/live-server-smoke.py) 是针对 **workbench**
+界面的 owner-local 冒烟测试：它驱动一台正在运行的服务器（默认
+`http://127.0.0.1:3080`），通过真实 HTTP 覆盖认证、hero 仪表盘、每个侧边栏页面、
+以及成员/账号管理的完整往返。它不属于本 lane：它需要运行中的服务器、
+web-login 的演示短信码日志和演示账号。运行方式为
+`python3 apps/web/tests/manual/live-server-smoke.py`；服务器地址、短信日志路径与
+账号号段均可通过 `WEB_BASE`、`WEB_SMS_LOG`、`WEB_OWNER`、`WEB_DEMO_USER`、
+`WEB_DEMO_PASS`、`WEB_NEW_PHONE` 环境变量覆盖。
