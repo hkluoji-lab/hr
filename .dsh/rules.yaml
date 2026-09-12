@@ -1,0 +1,7 @@
+rules:
+  - match:
+      network:
+        domains:
+          - registry.npmmirror.com
+    action: allow
+    reason: Allow registry.npmmirror.com (added from the settings page)
