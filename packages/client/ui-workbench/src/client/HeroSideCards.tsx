@@ -107,7 +107,7 @@ export function HeroSideCards({ state, t }: HeroSideCardsProps): ReactNode {
           <span className={css.demoChip}>{t('right.credits.demo')}</span>
         </div>
         <ul className={css.fileList}>
-          {DEMO_DELIVERABLE_KEYS.map(key => {
+          {DEMO_DELIVERABLE_KEYS.map((key) => {
             const name = t(key)
             return (
               <li key={key}>

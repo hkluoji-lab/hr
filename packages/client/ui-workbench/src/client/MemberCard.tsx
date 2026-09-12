@@ -34,7 +34,6 @@ export function MemberCard({ member, onStart, t }: MemberCardProps) {
       data-role={role?.id ?? 'generic'}
       disabled={member.state === 'offline'}
       onClick={() => { onStart(member.id) }}
-      title={member.description || member.name}
     >
       <span className={css.head}>
         <span className={css.icon}>
