@@ -64,6 +64,7 @@
 .taskStatus {
   padding: 2px 8px;
   border-radius: 999px;
+  corner-shape: round;
   font-size: 12px;
   line-height: 18px;
   white-space: nowrap;
@@ -198,6 +199,7 @@
   padding: 6px 12px;
   border: 1px solid var(--dsh-border, #eceef2);
   border-radius: 999px;
+  corner-shape: round;
   background: var(--dsh-surface, #ffffff);
   color: inherit;
   font-family: inherit;
@@ -365,6 +367,7 @@
   padding: 7px 14px;
   border: 1px solid var(--dsh-border, #eceef2);
   border-radius: 999px;
+  corner-shape: round;
   background: var(--dsh-surface, #ffffff);
   font-size: 13px;
   font-weight: 400;
@@ -382,6 +385,23 @@
 .roleCheck input {
   accent-color: var(--dsh-accent, #9a5cd6);
   margin: 0;
+}
+
+.phoneInput {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--dsh-border, #eceef2);
+  border-radius: 12px;
+  background: var(--dsh-surface, #ffffff);
+  color: var(--dsh-fg, #1f2329);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.phoneInput:focus {
+  border-color: var(--dsh-accent, #b478e8);
+  outline: none;
 }
 
 .inviteBox {
@@ -457,5 +477,296 @@
   .memberListRoles,
   .memberListMeta {
     display: none;
+  }
+}
+
+/* Clients page: schedule, client master, filing ledger */
+
+.clientRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.6fr) auto minmax(0, 0.9fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--dsh-border, #eceef2);
+  border-radius: 12px;
+  background: var(--dsh-surface, #ffffff);
+  font-size: 14px;
+}
+
+.clientName {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clientAlt {
+  margin-left: 8px;
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--dsh-fg-muted, #8a8f99);
+}
+
+.clientMeta {
+  font-size: 12px;
+  color: var(--dsh-fg-muted, #8a8f99);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scheduleRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) auto minmax(0, 0.7fr) auto auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--dsh-border, #eceef2);
+  border-radius: 12px;
+  background: var(--dsh-surface, #ffffff);
+  font-size: 14px;
+}
+
+.obligationRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) auto minmax(0, 0.7fr) auto auto auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--dsh-border, #eceef2);
+  border-radius: 12px;
+  background: var(--dsh-surface, #ffffff);
+  font-size: 14px;
+}
+
+.kindBadge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  corner-shape: round;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--dsh-accent, #9a5cd6);
+  background: var(--dsh-accent-soft, #f3eafd);
+}
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  corner-shape: round;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+/* Compliance state of a client master row. */
+
+.green {
+  color: #1c7c3c;
+  background: rgba(46, 158, 91, 0.12);
+}
+
+.yellow {
+  color: #8a6116;
+  background: rgba(217, 168, 60, 0.16);
+}
+
+.red {
+  color: #b03030;
+  background: rgba(217, 72, 72, 0.12);
+}
+
+/* Reminder tiers, cooler the further out the due date sits; class names match
+   the wire tier ids the badges render from. */
+
+.ok {
+  color: var(--dsh-fg-muted, #8a8f99);
+  background: var(--dsw-alias-interactive-bg-hover, rgba(139, 92, 246, 0.1));
+}
+
+.d30 {
+  color: #1c5c7c;
+  background: rgba(60, 140, 190, 0.12);
+}
+
+.d15 {
+  color: #1c7c6c;
+  background: rgba(46, 158, 120, 0.12);
+}
+
+.d7 {
+  color: #8a6116;
+  background: rgba(217, 168, 60, 0.16);
+}
+
+.d1 {
+  color: #a04a10;
+  background: rgba(224, 120, 40, 0.14);
+}
+
+.overdue {
+  color: #b03030;
+  background: rgba(217, 72, 72, 0.12);
+}
+
+/* Obligation lifecycle. */
+
+.open {
+  color: #1c5c7c;
+  background: rgba(60, 140, 190, 0.12);
+}
+
+.submitted {
+  color: #1c7c3c;
+  background: rgba(46, 158, 91, 0.12);
+}
+
+/* Delivery ledger rows: the follow-up queue, longest-waiting open rows first. */
+
+.deliveryRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto auto auto auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--dsh-border, #eceef2);
+  border-radius: 12px;
+  background: var(--dsh-surface, #ffffff);
+  font-size: 14px;
+}
+
+.deliveryTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.channelBadge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  corner-shape: round;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  color: #1c5c7c;
+  background: rgba(60, 140, 190, 0.12);
+}
+
+/* Delivery lifecycle; class names match the wire status ids. */
+
+.sent {
+  color: #1c5c7c;
+  background: rgba(60, 140, 190, 0.12);
+}
+
+.viewed {
+  color: #1c7c6c;
+  background: rgba(46, 158, 120, 0.12);
+}
+
+.signed {
+  color: #1c7c3c;
+  background: rgba(46, 158, 91, 0.12);
+}
+
+.returned {
+  color: var(--dsh-fg-muted, #8a8f99);
+  background: var(--dsw-alias-interactive-bg-hover, rgba(139, 92, 246, 0.1));
+}
+
+/* Follow-up ladder; class names match the wire tier ids the badges render
+   from. */
+
+.fresh {
+  color: var(--dsh-fg-muted, #8a8f99);
+  background: var(--dsw-alias-interactive-bg-hover, rgba(139, 92, 246, 0.1));
+}
+
+.nudge {
+  color: #1c5c7c;
+  background: rgba(60, 140, 190, 0.12);
+}
+
+.chase {
+  color: #8a6116;
+  background: rgba(217, 168, 60, 0.16);
+}
+
+.escalate {
+  color: #b03030;
+  background: rgba(217, 72, 72, 0.12);
+}
+
+.done {
+  color: #1c7c3c;
+  background: rgba(46, 158, 91, 0.12);
+}
+
+/* Follow-up center rows: a facts head line over the editable chase message,
+   channel picker, and logging action. */
+
+.followUpList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.followUpRow {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--dsh-border, #eceef2);
+  border-radius: 12px;
+  background: var(--dsh-surface, #ffffff);
+  font-size: 14px;
+}
+
+.followUpHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.followUpBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.followUpAction {
+  padding-bottom: 1px;
+}
+
+/* Client and obligation creation forms share one responsive field grid. */
+
+.clientForm {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 16px 0 12px;
+}
+
+@media (max-width: 900px) {
+  .clientRow,
+  .scheduleRow,
+  .obligationRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .clientMeta,
+  .kindBadge {
+    display: none;
+  }
+
+  .followUpBody {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

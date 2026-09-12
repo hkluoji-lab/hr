@@ -20,7 +20,7 @@ export const AUTH_SMS_VERIFY_ROUTE = '/auth/sms/verify'
 /** POST route signing in with phone and password. */
 export const AUTH_PASSWORD_LOGIN_ROUTE = '/auth/password/login'
 
-/** POST route creating one account with phone, SMS code, and password. */
+/** POST route creating one account with phone and password (plus an SMS code when the deployment demands one). */
 export const AUTH_REGISTER_ROUTE = '/auth/register'
 
 /** POST route resetting one account's password with an SMS code. */
@@ -38,8 +38,14 @@ export const TEAM_INVITES_REDEEM_ROUTE = '/team/invites/redeem'
 /** GET route listing the member roster (owner only). */
 export const TEAM_MEMBERS_ROUTE = '/team/members'
 
-/** Prefix of the `DELETE /team/members/:phone` unbind route. */
+/** Prefix of the owner-managed `PUT/DELETE /team/members/:phone` routes. */
 export const TEAM_MEMBERS_PHONE_PREFIX = '/team/members'
+
+/** GET route listing every registered account, bound or not (owner only). */
+export const TEAM_ACCOUNTS_ROUTE = '/team/accounts'
+
+/** Prefix of the owner-managed `DELETE /team/accounts/:phone` route. */
+export const TEAM_ACCOUNTS_PHONE_PREFIX = '/team/accounts'
 
 /** Mainland-China mobile number: leading 1 plus ten digits. */
 export const PHONE_PATTERN = /^1\d{10}$/
@@ -101,7 +107,12 @@ export interface PasswordLoginResult {
 /** Register request body. */
 export interface RegisterPayload {
   readonly phone: string
-  readonly code: string
+  /**
+   * The SMS code; required only when the deployment sets
+   * `requireRegistrationCode`. Omitted (or empty) in deployments that
+   * register from a phone and a password alone.
+   */
+  readonly code?: string
   readonly password: string
 }
 
@@ -189,4 +200,40 @@ export interface MemberListResult {
   readonly owner: string
   /** The roster, ordered by grant time. */
   readonly members: readonly MemberListEntry[]
+}
+
+/** Member-assign request body: the owner sets one member's whole role set. */
+export interface MemberAssignPayload {
+  /** The roles the member will hold after the call; at least one, no duplicates. */
+  readonly roles: readonly string[]
+}
+
+/** Member-assign success response: the binding now matches the request. */
+export interface MemberAssignResult {
+  readonly ok: true
+  /** The assigned member's phone number. */
+  readonly phone: string
+  /** The role set now bound to the phone. */
+  readonly roles: readonly string[]
+}
+
+/** One registered account of the accounts-list response. */
+export interface AccountEntry {
+  /** The account's phone number (owner-only management surface). */
+  readonly phone: string
+  /** The account's masked display name. */
+  readonly displayName: string
+  /** Registration time, epoch milliseconds. */
+  readonly createdAt: number
+  /** Most recent login time, epoch milliseconds. */
+  readonly lastLoginAt: number
+}
+
+/** Accounts-list success response. */
+export interface AccountListResult {
+  readonly ok: true
+  /** The owner's phone number. */
+  readonly owner: string
+  /** Every registered account, ordered by registration time. */
+  readonly accounts: readonly AccountEntry[]
 }

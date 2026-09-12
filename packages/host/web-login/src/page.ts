@@ -48,11 +48,35 @@ const HIGHLIGHT_ICONS = [
   '<rect x="5" y="10.5" width="14" height="9.5" rx="2.2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>',
 ] as const
 
+/** Render-time knobs of the login page. */
+export interface LoginPageOptions {
+  /**
+   * Whether the register form demands an SMS code. False renders no code
+   * field at all, so the account is created from a phone and a password.
+   */
+  readonly requireRegistrationCode: boolean
+}
+
 /**
  * Render the complete login page document.
+ * @param options - the deployment's register policy, mirrored by the page.
  * @returns the HTML document as one string.
  */
-export function renderLoginPage(): string {
+export function renderLoginPage(options: LoginPageOptions): string {
+  const registerCodeField = options.requireRegistrationCode
+    ? [
+      `<label for="reg-code">${strings.card.labelCode}</label>`,
+      '<div class="field">',
+      '  <input id="reg-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code"',
+      `         maxlength="6" placeholder="${strings.card.codePlaceholder}">`,
+      `  <button type="button" class="send" id="reg-send">${strings.card.sendCode}</button>`,
+      '</div>',
+    ].map(line => `        ${line}`).join('\n')
+    : ''
+  const registerCodeHint = options.requireRegistrationCode
+    ? ''
+    : `<p class="hint">${strings.card.noCodeHint}</p>`
+
   const highlightRows = strings.brand.highlights
     .map((highlight, index) => {
       const icon = HIGHLIGHT_ICONS[index] ?? HIGHLIGHT_ICONS[0]
@@ -227,6 +251,7 @@ label { display: block; font-size: 13px; font-weight: 500; margin: 16px 0 6px; }
 .reset-title { margin: 10px 0 0; font-size: 15.5px; font-weight: 600; letter-spacing: 1px; }
 .back { margin: 14px 0 0; text-align: center; }
 .notice { margin: 10px 0 0; font-size: 12.5px; color: #2f9e6e; }
+.hint { margin: 14px 0 0; font-size: 12.5px; color: var(--muted); }
 .error { margin: 10px 0 0; font-size: 13px; color: var(--danger); }
 .submit {
   margin-top: 22px; width: 100%; height: 46px; border: none; border-radius: 10px;
@@ -359,12 +384,7 @@ label { display: block; font-size: 13px; font-weight: 500; margin: 16px 0 6px; }
           <input id="reg-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel"
                  maxlength="11" placeholder="${strings.card.phonePlaceholder}">
         </div>
-        <label for="reg-code">${strings.card.labelCode}</label>
-        <div class="field">
-          <input id="reg-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code"
-                 maxlength="6" placeholder="${strings.card.codePlaceholder}">
-          <button type="button" class="send" id="reg-send">${strings.card.sendCode}</button>
-        </div>
+${registerCodeField}
         <label for="reg-password">${strings.card.labelNewPassword}</label>
         <div class="field has-eye">
           <input id="reg-password" name="password" type="password" autocomplete="new-password"
@@ -395,6 +415,7 @@ label { display: block; font-size: 13px; font-weight: 500; margin: 16px 0 6px; }
           <input id="reg-invite" name="invite" type="text" autocomplete="off"
                  maxlength="16" placeholder="${strings.card.invitePlaceholder}" spellcheck="false">
         </div>
+        ${registerCodeHint}
         <p class="error" id="reg-error" role="alert" hidden></p>
         <button class="submit" id="reg-submit" type="submit">${strings.card.submitRegister}</button>
       </form>
@@ -461,6 +482,9 @@ label { display: block; font-size: 13px; font-weight: 500; margin: 16px 0 6px; }
   var COPY = ${JSON.stringify(runtimeCopy)}
   var PHONE = /^1\\d{10}$/
   var CODE = /^\\d{6}$/
+  // Mirrors the deployment's register policy: false registers from a phone
+  // and a password alone, with no code field in the form at all.
+  var REG_CODE = ${String(options.requireRegistrationCode)}
   var $ = function (id) { return document.getElementById(id) }
 
   // Front-end mirror of the server's password policy: 8-64 chars, one letter, one digit.
@@ -559,7 +583,7 @@ label { display: block; font-size: 13px; font-weight: 500; margin: 16px 0 6px; }
     })
   }
   bindSend($('sms-send'), $('sms-phone'), $('sms-error'), $('sms-notice'))
-  bindSend($('reg-send'), $('reg-phone'), $('reg-error'), null)
+  if (REG_CODE) bindSend($('reg-send'), $('reg-phone'), $('reg-error'), null)
   bindSend($('reset-send'), $('reset-phone'), $('reset-error'), null)
 
   // ── panel switching ─────────────────────────────────────────────────────
@@ -674,18 +698,22 @@ label { display: block; font-size: 13px; font-weight: 500; margin: 16px 0 6px; }
     if (continueMode.register) { location.replace('/'); return }
     hideMessages()
     var phone = $('reg-phone').value.trim()
-    var code = $('reg-code').value.trim()
     var password = $('reg-password').value
     var confirm = $('reg-confirm').value
     if (!PHONE.test(phone)) { showError($('reg-error'), 'bad-phone'); $('reg-phone').focus(); return }
-    if (!CODE.test(code)) { showError($('reg-error'), 'bad-code'); $('reg-code').focus(); return }
+    var code = ''
+    if (REG_CODE) {
+      code = $('reg-code').value.trim()
+      if (!CODE.test(code)) { showError($('reg-error'), 'bad-code'); $('reg-code').focus(); return }
+    }
     if (!passwordOk(password)) { showLocal($('reg-error'), COPY.passwordHint); $('reg-password').focus(); return }
     if (password !== confirm) { showLocal($('reg-error'), COPY.passwordMismatch); $('reg-confirm').focus(); return }
     if (!$('agree').checked) { showLocal($('reg-error'), COPY.agreeRequired); return }
     var btn = $('reg-submit')
     btn.disabled = true
     btn.textContent = COPY.registering
-    post('/auth/register', { phone: phone, code: code, password: password }).then(function (reply) {
+    var body = REG_CODE ? { phone: phone, code: code, password: password } : { phone: phone, password: password }
+    post('/auth/register', body).then(function (reply) {
       if (reply.status === 200 && reply.data && reply.data.ok) {
         var invite = $('reg-invite').value.trim()
         if (invite === '') { location.replace(reply.data.redirect || '/'); return }

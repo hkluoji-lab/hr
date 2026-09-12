@@ -14,7 +14,9 @@
  *
  * Beyond the hero, the same controller owns which workbench page covers the
  * frame (the sidebar nav toggles one), the bounded credits ledger the report
- * page reads, and the owner's members-management data.
+ * page reads, the owner's members-management data, and the secretary-company
+ * client master with its statutory-filing ledger, the current year's
+ * compliance schedule, and the signature-delivery ledger (the clients page).
  *
  * The logged-in caller's role binding arrives through one same-origin
  * `/auth/status` read (the host login surface's wire contract): owners and
@@ -35,13 +37,19 @@ import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { AgentPresetRoster } from '@deepseek-ai/dsh-agent-presets/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { WorkbenchCreditEntry } from '@deepseek-ai/dsh-workbench/types'
+import type {
+  WorkbenchClient, WorkbenchClientCreate, WorkbenchCreditEntry, WorkbenchDelivery,
+  WorkbenchDeliveryCreate, WorkbenchDeliveryStatus, WorkbenchFollowUp, WorkbenchFollowUpCreate,
+  WorkbenchObligation, WorkbenchObligationCreate, WorkbenchSchedule,
+} from '@deepseek-ai/dsh-workbench/types'
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 // Wire contract of the host login surface: same-origin routes and payloads.
 import {
-  AUTH_STATUS_ROUTE, TEAM_INVITES_CREATE_ROUTE, TEAM_MEMBERS_PHONE_PREFIX, TEAM_MEMBERS_ROUTE,
-  type AuthStatusPayload, type InviteCreatePayload, type InviteCreateResult, type MemberListEntry,
-  type MemberListResult,
+  AUTH_STATUS_ROUTE, TEAM_ACCOUNTS_PHONE_PREFIX, TEAM_ACCOUNTS_ROUTE,
+  TEAM_INVITES_CREATE_ROUTE, TEAM_MEMBERS_PHONE_PREFIX, TEAM_MEMBERS_ROUTE,
+  type AccountEntry, type AccountListResult, type AuthStatusPayload, type InviteCreatePayload,
+  type InviteCreateResult, type MemberAssignPayload,
+  type MemberListEntry, type MemberListResult,
 } from '@deepseek-ai/dsh-web-login/shared'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { ROLES, roleOf, type RoleId, type RoleMeta } from './roles.ts'
@@ -193,7 +201,7 @@ const INITIAL: WorkbenchState = {
 }
 
 /** A workbench page the sidebar surfaces as a frame-wide overlay. */
-export type WorkbenchPageId = 'hall' | 'assistant' | 'active' | 'team' | 'report' | 'members'
+export type WorkbenchPageId = 'hall' | 'assistant' | 'active' | 'clients' | 'team' | 'report' | 'members'
 
 /** Which workbench page, if any, covers the app frame. */
 export interface WorkbenchPagesState {
@@ -236,11 +244,51 @@ export interface MembersState {
   status: 'idle' | 'loading' | 'ready' | 'error'
   /** The read failure message, cleared on the next successful read. */
   error: string | null
+  /** The owner's phone number; empty before the first read answers. */
+  owner: string
   /** The bound roster, ordered by grant time. */
   members: readonly MemberListEntry[]
+  /** Every registered account, ordered by registration time, bound or not. */
+  accounts: readonly AccountEntry[]
 }
 
-const MEMBERS_INITIAL: MembersState = { status: 'idle', error: null, members: [] }
+const MEMBERS_INITIAL: MembersState = { status: 'idle', error: null, owner: '', members: [], accounts: [] }
+
+/**
+ * The clients-page read lifecycle: the client master (S-CORE-01), the filing
+ * obligation ledger (S-COMPL-01), the current year's compliance schedule, the
+ * signature-delivery ledger (S-DELIV-01), and the follow-up center
+ * (S-FOLLOW-01), all served by the host workbench Remote.
+ */
+export interface ClientsState {
+  /** Read lifecycle of the clients page. */
+  status: 'idle' | 'loading' | 'ready' | 'error'
+  /** The read failure message, cleared on the next successful read. */
+  error: string | null
+  /** Every stored client row, creation order preserved. */
+  clients: readonly WorkbenchClient[]
+  /** Every stored obligation row, open rows first, soonest due first. */
+  obligations: readonly WorkbenchObligation[]
+  /** The current year's filing schedule, or null until the first read. */
+  schedule: WorkbenchSchedule | null
+  /** Every stored delivery row, longest-waiting open rows first. */
+  deliveries: readonly WorkbenchDelivery[]
+  /** The follow-up center's actionable rows, most urgent rung first. */
+  followUps: readonly WorkbenchFollowUp[]
+}
+
+const CLIENTS_INITIAL: ClientsState = {
+  status: 'idle', error: null, clients: [], obligations: [], schedule: null, deliveries: [], followUps: [],
+}
+
+/**
+ * One host mutation's outcome for the clients page: failures carry the wire
+ * error code (the page maps known codes to friendly copy) beside the raw
+ * message.
+ */
+export type MutationOutcome =
+  | { ok: true }
+  | { ok: false; code: string | null; error: string }
 
 /** One invite-creation outcome for the owner's management page. */
 export type InviteOutcome =
@@ -452,6 +500,9 @@ export class WorkbenchController {
   /** Members-management snapshot the owner's roster page subscribes to. */
   readonly members: SnapshotStore<MembersState> = createSnapshotStore(MEMBERS_INITIAL)
 
+  /** Clients-page snapshot: client master, obligation ledger, and schedule. */
+  readonly clients: SnapshotStore<ClientsState> = createSnapshotStore(CLIENTS_INITIAL)
+
   /** Preset and brief staged for the blank session the next start creates. */
   private staged: StagedStart | undefined
 
@@ -609,20 +660,181 @@ export class WorkbenchController {
     this.ledger.set({ status: 'ready', error: null, entries: result.value.entries })
   }
 
-  /** Read the member roster into the owner's management page snapshot. */
+  /**
+   * Read the member roster and the registered-account list into the owner's
+   * management page snapshot. Both feed the one page and every write below
+   * re-reads them together, so a single lifecycle reports either failure.
+   */
   async loadMembers(): Promise<void> {
-    this.members.set({ status: 'loading', error: null, members: this.members.getSnapshot().members })
+    this.members.set({ ...this.members.getSnapshot(), status: 'loading', error: null })
     try {
-      const response = await this.fetcher(new URL(TEAM_MEMBERS_ROUTE, hostBase()), { headers: { accept: 'application/json' } })
-      if (!response.ok) {
-        this.members.set({ status: 'error', error: await responseMessage(response), members: [] })
+      const [rosterResponse, accountsResponse] = await Promise.all([
+        this.fetcher(new URL(TEAM_MEMBERS_ROUTE, hostBase()), { headers: { accept: 'application/json' } }),
+        this.fetcher(new URL(TEAM_ACCOUNTS_ROUTE, hostBase()), { headers: { accept: 'application/json' } }),
+      ])
+      const failed = rosterResponse.ok ? accountsResponse : rosterResponse
+      if (!failed.ok) {
+        this.members.set({ status: 'error', error: await responseMessage(failed), owner: '', members: [], accounts: [] })
         return
       }
-      const payload = await response.json() as MemberListResult
-      this.members.set({ status: 'ready', error: null, members: payload.members })
+      const roster = await rosterResponse.json() as MemberListResult
+      const accounts = await accountsResponse.json() as AccountListResult
+      this.members.set({
+        status: 'ready', error: null, owner: accounts.owner,
+        members: roster.members, accounts: accounts.accounts,
+      })
     } catch (error) {
-      this.members.set({ status: 'error', error: error instanceof Error ? error.message : String(error), members: [] })
+      this.members.set({ status: 'error', error: error instanceof Error ? error.message : String(error), owner: '', members: [], accounts: [] })
     }
+  }
+
+  /**
+   * Read the client master, the obligation ledger, the current year's
+   * schedule, the delivery ledger, and the follow-up center into the
+   * clients-page snapshot. Every write below re-reads the same quintuple, so
+   * the page never derives what the host already decided.
+   */
+  async loadClients(): Promise<void> {
+    const keep = this.clients.getSnapshot()
+    this.clients.set({ ...keep, status: 'loading', error: null })
+    const [master, ledger, schedule, deliveries, followUps] = await Promise.all([
+      this.ctx.remote.workbench.clients(),
+      this.ctx.remote.workbench.obligations(),
+      this.ctx.remote.workbench.complianceSchedule(),
+      this.ctx.remote.workbench.deliveries(),
+      this.ctx.remote.workbench.followUps(),
+    ])
+    if (!master.ok || !ledger.ok || !schedule.ok || !deliveries.ok || !followUps.ok) {
+      const failure = [master, ledger, schedule, deliveries, followUps].find(read => !read.ok)
+      this.clients.set({
+        status: 'error', error: failure?.error.message ?? 'unknown failure',
+        clients: [], obligations: [], schedule: null, deliveries: [], followUps: [],
+      })
+      return
+    }
+    this.clients.set({
+      status: 'ready',
+      error: null,
+      clients: master.value.clients,
+      obligations: ledger.value.obligations,
+      schedule: schedule.value,
+      deliveries: deliveries.value.deliveries,
+      followUps: followUps.value.followUps,
+    })
+  }
+
+  /**
+   * Create one client master row, then refresh the page from the host.
+   * @param payload - the creation request.
+   * @returns the mutation outcome; a failure carries the host's error code and message.
+   */
+  async addClient(payload: WorkbenchClientCreate): Promise<MutationOutcome> {
+    const result = await this.ctx.remote.workbench.addClient(payload)
+    if (!result.ok) return { ok: false, code: result.error.code, error: result.error.message }
+    await this.loadClients()
+    return { ok: true }
+  }
+
+  /**
+   * Remove one client master row (its obligations go with it), then refresh.
+   * @param id - the client id to remove.
+   * @returns the mutation outcome; a failure carries the host's error code and message.
+   */
+  async removeClient(id: string): Promise<MutationOutcome> {
+    const result = await this.ctx.remote.workbench.removeClient(id)
+    if (!result.ok) return { ok: false, code: result.error.code, error: result.error.message }
+    await this.loadClients()
+    return { ok: true }
+  }
+
+  /**
+   * Record one filing obligation against a client, then refresh.
+   * @param payload - the recording request.
+   * @returns the mutation outcome; a failure carries the host's error code and message.
+   */
+  async addObligation(payload: WorkbenchObligationCreate): Promise<MutationOutcome> {
+    const result = await this.ctx.remote.workbench.addObligation(payload)
+    if (!result.ok) return { ok: false, code: result.error.code, error: result.error.message }
+    await this.loadClients()
+    return { ok: true }
+  }
+
+  /**
+   * Move one obligation between `open` and `submitted`, then refresh.
+   * @param id - the obligation id.
+   * @param status - the lifecycle state to set.
+   * @returns the mutation outcome; a failure carries the host's error code and message.
+   */
+  async markObligation(id: string, status: 'open' | 'submitted'): Promise<MutationOutcome> {
+    const result = await this.ctx.remote.workbench.markObligation(id, status)
+    if (!result.ok) return { ok: false, code: result.error.code, error: result.error.message }
+    await this.loadClients()
+    return { ok: true }
+  }
+
+  /**
+   * Remove one obligation row, then refresh.
+   * @param id - the obligation id to remove.
+   * @returns the mutation outcome; a failure carries the host's error code and message.
+   */
+  async removeObligation(id: string): Promise<MutationOutcome> {
+    const result = await this.ctx.remote.workbench.removeObligation(id)
+    if (!result.ok) return { ok: false, code: result.error.code, error: result.error.message }
+    await this.loadClients()
+    return { ok: true }
+  }
+
+  /**
+   * Record one signature delivery against a client, then refresh.
+   * @param payload - the recording request.
+   * @returns the mutation outcome; a failure carries the host's error code and message.
+   */
+  async addDelivery(payload: WorkbenchDeliveryCreate): Promise<MutationOutcome> {
+    const result = await this.ctx.remote.workbench.addDelivery(payload)
+    if (!result.ok) return { ok: false, code: result.error.code, error: result.error.message }
+    await this.loadClients()
+    return { ok: true }
+  }
+
+  /**
+   * Move one delivery along its lifecycle (`sent`/`viewed`/`signed`/`returned`),
+   * then refresh.
+   * @param id - the delivery id.
+   * @param status - the lifecycle state to set.
+   * @returns the mutation outcome; a failure carries the host's error code and message.
+   */
+  async markDelivery(id: string, status: WorkbenchDeliveryStatus): Promise<MutationOutcome> {
+    const result = await this.ctx.remote.workbench.markDelivery(id, status)
+    if (!result.ok) return { ok: false, code: result.error.code, error: result.error.message }
+    await this.loadClients()
+    return { ok: true }
+  }
+
+  /**
+   * Remove one delivery row, then refresh.
+   * @param id - the delivery id to remove.
+   * @returns the mutation outcome; a failure carries the host's error code and message.
+   */
+  async removeDelivery(id: string): Promise<MutationOutcome> {
+    const result = await this.ctx.remote.workbench.removeDelivery(id)
+    if (!result.ok) return { ok: false, code: result.error.code, error: result.error.message }
+    await this.loadClients()
+    return { ok: true }
+  }
+
+  /**
+   * Log one follow-up reminder against an open delivery or obligation, then
+   * refresh so the row's reminder count and the queue's rungs come back from
+   * the host rather than being derived here.
+   * @param payload - the logging request; channel and message default to the
+   *   rung's host draft when omitted.
+   * @returns the mutation outcome; a failure carries the host's error code and message.
+   */
+  async recordFollowUp(payload: WorkbenchFollowUpCreate): Promise<MutationOutcome> {
+    const result = await this.ctx.remote.workbench.recordFollowUp(payload)
+    if (!result.ok) return { ok: false, code: result.error.code, error: result.error.message }
+    await this.loadClients()
+    return { ok: true }
   }
 
   /**
@@ -655,6 +867,51 @@ export class WorkbenchController {
     try {
       const response = await this.fetcher(
         new URL(`${TEAM_MEMBERS_PHONE_PREFIX}/${encodeURIComponent(phone)}`, hostBase()),
+        { method: 'DELETE' },
+      )
+      if (!response.ok) return await responseMessage(response)
+      await this.loadMembers()
+      return null
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error)
+    }
+  }
+
+  /**
+   * Assign one registered account its whole role set, then refresh the roster.
+   * @param phone - the member's phone number; the account must already exist.
+   * @param roles - the roles the member will hold; at least one.
+   * @returns the host failure message, or null when the assignment landed.
+   */
+  async assignMember(phone: string, roles: readonly RoleId[]): Promise<string | null> {
+    const body: MemberAssignPayload = { roles: [...roles] }
+    try {
+      const response = await this.fetcher(
+        new URL(`${TEAM_MEMBERS_PHONE_PREFIX}/${encodeURIComponent(phone)}`, hostBase()),
+        {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        },
+      )
+      if (!response.ok) return await responseMessage(response)
+      await this.loadMembers()
+      return null
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error)
+    }
+  }
+
+  /**
+   * Delete one registered account, its credential, and its role binding, then
+   * refresh both lists from the host.
+   * @param phone - the account's phone number; the owner's own phone is refused.
+   * @returns the host failure message, or null when the deletion landed.
+   */
+  async deleteAccount(phone: string): Promise<string | null> {
+    try {
+      const response = await this.fetcher(
+        new URL(`${TEAM_ACCOUNTS_PHONE_PREFIX}/${encodeURIComponent(phone)}`, hostBase()),
         { method: 'DELETE' },
       )
       if (!response.ok) return await responseMessage(response)

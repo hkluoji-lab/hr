@@ -175,5 +175,6 @@
   width: 4px;
   height: 4px;
   border-radius: 50%;
+  corner-shape: round;
   background: var(--dsw-alias-label-tertiary, #b0b0b0);
 }

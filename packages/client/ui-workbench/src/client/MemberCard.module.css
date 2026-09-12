@@ -65,6 +65,7 @@
   margin-top: 1px;
   padding: 2px 9px;
   border-radius: 999px;
+  corner-shape: round;
   background: #fbeaf3;
   color: #c2508f;
   font-size: 11px;

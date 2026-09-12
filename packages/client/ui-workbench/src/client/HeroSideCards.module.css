@@ -47,6 +47,7 @@
   flex: none;
   padding: 2px 8px;
   border-radius: 999px;
+  corner-shape: round;
   background: #f6e7f2;
   color: #a06a96;
   font-size: 11px;
@@ -112,6 +113,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
+  corner-shape: round;
   flex: none;
 }
 
@@ -169,6 +171,7 @@
 .progressTrack {
   height: 4px;
   border-radius: 99px;
+  corner-shape: round;
   background: #f2edf4;
   overflow: hidden;
 }
@@ -176,6 +179,7 @@
 .progressFill {
   height: 100%;
   border-radius: 99px;
+  corner-shape: round;
   background: linear-gradient(90deg, #e9639f 0%, #c07fd6 100%);
 }
 

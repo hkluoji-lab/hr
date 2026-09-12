@@ -1,7 +1,8 @@
 /**
- * The web login surface: the rendered login page and the phone + SMS-code
- * registration/login routes, plus the `loginSession` identity service other
- * host plugins read for the most recent login.
+ * The web login surface: the rendered login page and the phone login /
+ * registration routes (SMS code, password, or a phone and a password alone),
+ * plus the `loginSession` identity service other host plugins read for the
+ * most recent login.
  *
  * Trust has one home, in the composition's `connection` service, and this
  * package reuses it as-is: every route asks `requestRejection` first, whose
@@ -23,12 +24,18 @@
  * Accounts persist in the `web-login` storage domain (`accounts` keyed by
  * phone; the masked display name is derived at write time). First successful
  * verification registers the account — login and registration are one flow.
+ * `POST /auth/register` creates the account from a phone and a password;
+ * `requireRegistrationCode` adds an SMS-code demand on top, so a deployment
+ * that leaves it false registers accounts with no SMS provider at all.
  *
  * On top of accounts sits the member model: the owner (the earliest
  * registered account) creates single-use role invites and manages the roster
  * (`POST /team/invites`, `GET/DELETE /team/members...`); any logged-in
  * phone redeems an invite to bind its roles (`POST /team/invites/redeem`,
- * unioned into any existing roles). `/auth/status` answers the caller's roles
+ * unioned into any existing roles). The same owner reads every registered
+ * account through `GET /team/accounts` and removes one with
+ * `DELETE /team/accounts/:phone` — credential and binding go with it, and the
+ * owner's own account is refused. `/auth/status` answers the caller's roles
  * and ownership next to the login facts, so consumers need no second source.
  */
 
@@ -43,11 +50,12 @@ import {
   AUTH_LOGOUT_ROUTE, AUTH_PASSWORD_LOGIN_ROUTE, AUTH_PASSWORD_RESET_ROUTE,
   AUTH_REGISTER_ROUTE, AUTH_SMS_SEND_ROUTE, AUTH_SMS_VERIFY_ROUTE,
   AUTH_STATUS_ROUTE, LOGIN_PAGE_ROUTE, PHONE_PATTERN,
+  TEAM_ACCOUNTS_PHONE_PREFIX, TEAM_ACCOUNTS_ROUTE,
   TEAM_INVITES_CREATE_ROUTE, TEAM_INVITES_REDEEM_ROUTE, TEAM_MEMBERS_PHONE_PREFIX,
   TEAM_MEMBERS_ROUTE,
-  type InviteCreateResult, type InviteRedeemResult, type LoginErrorPayload,
-  type MemberListResult, type PasswordLoginResult, type PasswordResetResult,
-  type RegisterResult,
+  type AccountListResult, type InviteCreateResult, type InviteRedeemResult, type LoginErrorPayload,
+  type MemberAssignResult, type MemberListResult, type PasswordLoginResult,
+  type PasswordResetResult, type RegisterResult,
 } from './shared.ts'
 import {
   maskPhone, memberRolesSchema, passwordSchema, webLoginDomainSpec,
@@ -79,6 +87,12 @@ export interface Config {
   readonly codeValiditySeconds: number
   /** Wrong verifications allowed before one challenge is destroyed. */
   readonly maxVerificationAttempts: number
+  /**
+   * Whether `POST /auth/register` demands an SMS code beside the password.
+   * False creates the account from a phone and a password alone, so a
+   * deployment with no SMS provider can still register accounts.
+   */
+  readonly requireRegistrationCode: boolean
   /** How long one member invite stays redeemable, in seconds. */
   readonly inviteValiditySeconds: number
 }
@@ -88,6 +102,7 @@ export const Config: z<Config> = z.object({
   codeCooldownSeconds: z.natural().min(1).max(600).default(60),
   codeValiditySeconds: z.natural().min(5).max(3600).default(300),
   maxVerificationAttempts: z.natural().min(1).max(10).default(5),
+  requireRegistrationCode: z.boolean().default(false),
   inviteValiditySeconds: z.natural().min(60).max(2_592_000).default(604_800),
 })
 
@@ -143,8 +158,8 @@ function sendError(
   sendJson(res, status, error)
 }
 
-/** 405 with the route's one supported method. */
-function sendMethodNotAllowed(res: ServerResponse, allow: 'GET' | 'POST' | 'DELETE'): void {
+/** 405 with the route's supported methods. */
+function sendMethodNotAllowed(res: ServerResponse, allow: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PUT, DELETE'): void {
   res.statusCode = 405
   res.setHeader('allow', allow)
   res.end()
@@ -222,16 +237,17 @@ function wireCode(res: ServerResponse, raw: string | undefined): string | undefi
 }
 
 /**
- * Read one POST's JSON object body, answering every wire rejection (method,
- * media type, size ceiling, parse). Returns undefined when the response was
- * already answered.
+ * Read one JSON object body, answering every wire rejection (method, media
+ * type, size ceiling, parse). Returns undefined when the response was already
+ * answered.
  */
 async function readPostObject(
   req: IncomingMessage,
   res: ServerResponse,
+  allow: 'POST' | 'PUT' = 'POST',
 ): Promise<Record<string, unknown> | undefined> {
-  if (req.method !== 'POST') {
-    sendMethodNotAllowed(res, 'POST')
+  if (req.method !== allow) {
+    sendMethodNotAllowed(res, allow)
     return undefined
   }
   if (mediaEssence(req) !== 'application/json') {
@@ -369,8 +385,8 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   }
 
   /**
-   * Read the register/reset wire triple (`phone`, `code`, `password`), answering
-   * every field and policy rejection.
+   * Read the password-reset wire triple (`phone`, `code`, `password`),
+   * answering every field and policy rejection.
    * @returns `[phone, code, validPassword]`, or undefined when answered.
    */
   const readCredentialFields = async (
@@ -381,6 +397,33 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     if (fields === undefined) return undefined
     const phone = wirePhone(res, fields[0])
     if (phone === undefined) return undefined
+    const code = wireCode(res, fields[1])
+    if (code === undefined) return undefined
+    const validPassword = rejectWeakPassword(res, fields[2])
+    if (validPassword === undefined) return undefined
+    return [phone, code, validPassword]
+  }
+
+  /**
+   * Read the register wire — `phone` and `password`, plus `code` when the
+   * deployment demands one — answering every field and policy rejection.
+   * @returns `[phone, code, validPassword]` with `code` undefined when the
+   *   deployment does not demand one, or undefined when the response was answered.
+   */
+  const readRegisterFields = async (
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<[phone: string, code: string | undefined, validPassword: string] | undefined> => {
+    const requireCode = config.requireRegistrationCode
+    const fields = await readPostFields(req, res, requireCode ? ['phone', 'code', 'password'] : ['phone', 'password'])
+    if (fields === undefined) return undefined
+    const phone = wirePhone(res, fields[0])
+    if (phone === undefined) return undefined
+    if (!requireCode) {
+      const validPassword = rejectWeakPassword(res, fields[1])
+      if (validPassword === undefined) return undefined
+      return [phone, undefined, validPassword]
+    }
     const code = wireCode(res, fields[1])
     if (code === undefined) return undefined
     const validPassword = rejectWeakPassword(res, fields[2])
@@ -482,7 +525,9 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       res.setHeader('content-type', 'text/html; charset=utf-8')
       res.setHeader('cache-control', 'no-store')
       res.setHeader('referrer-policy', 'no-referrer')
-      res.end(req.method === 'HEAD' ? undefined : renderLoginPage())
+      res.end(req.method === 'HEAD' ? undefined : renderLoginPage({
+        requireRegistrationCode: config.requireRegistrationCode,
+      }))
     },
   }), `web-login: GET ${LOGIN_PAGE_ROUTE}`)
 
@@ -600,14 +645,14 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     path: AUTH_REGISTER_ROUTE,
     handler: async (req, res) => {
       if (rejected(req, res)) return
-      const wire = await readCredentialFields(req, res)
+      const wire = await readRegisterFields(req, res)
       if (wire === undefined) return
       const [phone, code, validPassword] = wire
       if (accounts.get(phone) !== undefined) {
         sendError(res, 409, { code: 'phone-registered', message: 'this phone is already registered; sign in instead' })
         return
       }
-      if (!verifyChallenge(res, phone, code)) return
+      if (code !== undefined && !verifyChallenge(res, phone, code)) return
       const now = Date.now()
       const displayName = maskPhone(phone)
       await accounts.put(phone, { displayName, createdAt: now, lastLoginAt: now })
@@ -749,9 +794,103 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     },
   }), `web-login: GET ${TEAM_MEMBERS_ROUTE}`)
 
+  /**
+   * Parse the phone from a `<prefix>/:phone` path tail.
+   * @param req - the incoming request.
+   * @param prefix - the registered route prefix the tail hangs off.
+   * @returns the phone, or undefined when the tail is absent, is not valid
+   *   percent-encoding, or does not match the phone pattern.
+   */
+  const phoneFromPath = (req: IncomingMessage, prefix: string): string | undefined => {
+    const rest = req.url?.slice(prefix.length) ?? ''
+    const tail = (rest.startsWith('/') ? rest.slice(1) : rest).split('?', 1)[0] ?? ''
+    try {
+      const phone = decodeURIComponent(tail)
+      return PHONE_PATTERN.test(phone) ? phone : undefined
+    } catch {
+      // Swallows the decode error: malformed percent-encoding is the reject case.
+      return undefined
+    }
+  }
+
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
     path: TEAM_MEMBERS_PHONE_PREFIX,
+    handler: async (req, res) => {
+      if (rejected(req, res)) return
+      if (rejectNonOwner(req, res)) return
+      if (req.method !== 'PUT' && req.method !== 'DELETE') {
+        sendMethodNotAllowed(res, 'PUT, DELETE')
+        return
+      }
+      const phone = phoneFromPath(req, TEAM_MEMBERS_PHONE_PREFIX)
+      if (phone === undefined) {
+        sendError(res, 400, { code: 'bad-phone', message: 'phone must match ^1\\d{10}$' })
+        return
+      }
+      if (phone === ownerPhone()) {
+        // The owner derives from the accounts table and renders the full
+        // roster regardless of roles, so touching their binding would only
+        // add a record ownership already outlives.
+        sendError(res, 403, { code: 'forbidden', message: 'the owner binding is managed implicitly' })
+        return
+      }
+      if (req.method === 'PUT') {
+        const body = await readPostObject(req, res, 'PUT')
+        if (body === undefined) return
+        const roles = rejectInvalidRoles(res, stringArrayField(body, 'roles'))
+        if (roles === undefined) return
+        if (accounts.get(phone) === undefined) {
+          sendError(res, 400, { code: 'no-account', message: 'this phone is not registered' })
+          return
+        }
+        // Assignment replaces the whole set: the owner edits the member's
+        // role list as one decision, unlike the union an invite redeems.
+        const record: MemberRecord = {
+          roles,
+          grantedBy: maskPhone(ownerPhone() ?? ''),
+          grantedAt: Date.now(),
+        }
+        await members.put(phone, record)
+        const reply: MemberAssignResult = { ok: true, phone, roles: record.roles }
+        sendJson(res, 200, reply)
+        return
+      }
+      await members.delete(phone)
+      res.statusCode = 204
+      res.end()
+    },
+  }), `web-login: PUT/DELETE ${TEAM_MEMBERS_PHONE_PREFIX}:phone`)
+
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: TEAM_ACCOUNTS_ROUTE,
+    handler: (req, res) => {
+      if (rejected(req, res)) return
+      if (rejectNonOwner(req, res)) return
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        sendMethodNotAllowed(res, 'GET')
+        return
+      }
+      // Every registered account, bound or not: a roster row exists only once
+      // roles are granted, so deleting an account that never bound a role
+      // needs this list to be reachable from the page at all.
+      const rows = [...accounts.entries()]
+        .map(([phone, account]) => ({
+          phone,
+          displayName: account.displayName,
+          createdAt: account.createdAt,
+          lastLoginAt: account.lastLoginAt,
+        }))
+        .sort((a, b) => a.createdAt - b.createdAt || (a.phone < b.phone ? -1 : 1))
+      const reply: AccountListResult = { ok: true, owner: ownerPhone() ?? '', accounts: rows }
+      sendJson(res, 200, reply)
+    },
+  }), `web-login: GET ${TEAM_ACCOUNTS_ROUTE}`)
+
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'prefix',
+    path: TEAM_ACCOUNTS_PHONE_PREFIX,
     handler: async (req, res) => {
       if (rejected(req, res)) return
       if (rejectNonOwner(req, res)) return
@@ -759,29 +898,29 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
         sendMethodNotAllowed(res, 'DELETE')
         return
       }
-      const rest = req.url?.slice(TEAM_MEMBERS_PHONE_PREFIX.length) ?? ''
-      const tail = (rest.startsWith('/') ? rest.slice(1) : rest).split('?', 1)[0] ?? ''
-      let phone = ''
-      try {
-        phone = decodeURIComponent(tail)
-      } catch {
-        // Swallows the decode error: malformed percent-encoding is the reject case.
-        sendError(res, 400, { code: 'bad-phone', message: 'phone must match ^1\\d{10}$' })
-        return
-      }
-      if (!PHONE_PATTERN.test(phone)) {
+      const phone = phoneFromPath(req, TEAM_ACCOUNTS_PHONE_PREFIX)
+      if (phone === undefined) {
         sendError(res, 400, { code: 'bad-phone', message: 'phone must match ^1\\d{10}$' })
         return
       }
       if (phone === ownerPhone()) {
-        // The owner derives from the accounts table, so unbinding their roles
-        // would not revoke ownership — refusing keeps that mismatch invisible.
-        sendError(res, 403, { code: 'forbidden', message: 'the owner cannot be unbound' })
+        // Ownership derives from the earliest account, so deleting the owner
+        // would silently hand it to whichever account registered next.
+        sendError(res, 403, { code: 'forbidden', message: 'the owner account cannot be deleted' })
         return
       }
+      if (accounts.get(phone) === undefined) {
+        sendError(res, 400, { code: 'no-account', message: 'this phone is not registered' })
+        return
+      }
+      // Dependents first: the account row is what the roster names, so a
+      // reader between the two writes sees a binding without its account
+      // rather than an account whose bindings survived it.
+      await credentials.delete(phone)
       await members.delete(phone)
+      await accounts.delete(phone)
       res.statusCode = 204
       res.end()
     },
-  }), `web-login: DELETE ${TEAM_MEMBERS_PHONE_PREFIX}:phone`)
+  }), `web-login: DELETE ${TEAM_ACCOUNTS_PHONE_PREFIX}:phone`)
 }

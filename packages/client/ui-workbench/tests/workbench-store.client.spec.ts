@@ -50,6 +50,11 @@ interface CtxOptions {
   binding?: (id: string) => unknown
   /** Replace the same-origin fetch double; default answers every route 401. */
   fetcher?: FetchDouble
+  /**
+   * Extra `remote.workbench` methods layered over the default `snapshot`
+   * double; each recorded as `workbench.<name>` with its own canned answer.
+   */
+  workbench?: Record<string, (...args: never[]) => Promise<unknown>>
 }
 
 /** Build the same-origin fetch double: record `METHOD url` and reply once. */
@@ -93,6 +98,13 @@ function makeCtx(
       },
       workbench: {
         snapshot: () => { calls.push('workbench.snapshot'); return Promise.resolve(snapshotResult) },
+        ...Object.fromEntries(Object.entries(options.workbench ?? {}).map(([name, method]) => [
+          name,
+          (...args: never[]) => {
+            calls.push(`workbench.${name}`)
+            return method(...args)
+          },
+        ])),
       },
     },
     sessions: {
@@ -649,16 +661,30 @@ describe('members management round trips', () => {
     phone: '13800138000', displayName: '138****8000', roles: ['accountant'],
     grantedBy: '139****9000', grantedAt: 1,
   }
+  const ACCOUNT = {
+    phone: '13900139000', displayName: '139****9000', createdAt: 1, lastLoginAt: 2,
+  }
 
-  it('reads the roster into the members snapshot and surfaces the host message on failure', async () => {
+  /** Reply to the roster and account reads with the canned owner and account list. */
+  function memberReads(calls: string[], accounts: readonly unknown[] = []): FetchDouble {
+    return fetchReply(calls, url => url === '/team/accounts'
+      ? { status: 200, body: { ok: true, owner: ACCOUNT.phone, accounts } }
+      : { status: 200, body: { ok: true, owner: ACCOUNT.phone, members: [] } })
+  }
+
+  it('reads the roster and the account list into the members snapshot and surfaces the host message on failure', async () => {
     const calls: string[] = []
     const ok = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
-      fetcher: fetchReply(calls, () => ({ status: 200, body: { ok: true, owner: '139****9000', members: [ENTRY] } })),
+      fetcher: fetchReply(calls, url => url === '/team/accounts'
+        ? { status: 200, body: { ok: true, owner: ACCOUNT.phone, accounts: [ACCOUNT] } }
+        : { status: 200, body: { ok: true, owner: ACCOUNT.phone, members: [ENTRY] } }),
     })
     const controller = new WorkbenchController(ok.ctx as never, ok.fetcher)
     await controller.loadMembers()
-    expect(controller.members.getSnapshot()).toMatchObject({ status: 'ready', error: null, members: [ENTRY] })
-    expect(calls).toEqual(['GET /team/members'])
+    expect(controller.members.getSnapshot()).toMatchObject({
+      status: 'ready', error: null, owner: ACCOUNT.phone, members: [ENTRY], accounts: [ACCOUNT],
+    })
+    expect(calls).toEqual(['GET /team/members', 'GET /team/accounts'])
 
     const failed = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
       fetcher: fetchReply([], () => ({ status: 403, body: { code: 'forbidden', message: 'owner only' } })),
@@ -698,17 +724,276 @@ describe('members management round trips', () => {
   it('unbinds a member by phone and refreshes the roster, surfacing failures', async () => {
     const calls: string[] = []
     const bench = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
-      fetcher: fetchReply(calls, () => ({ status: 200, body: { ok: true, owner: 'o', members: [] } })),
+      fetcher: memberReads(calls),
     })
     const controller = new WorkbenchController(bench.ctx as never, bench.fetcher)
 
     await expect(controller.unbindMember('13800138000')).resolves.toBeNull()
-    expect(calls).toEqual(['DELETE /team/members/13800138000', 'GET /team/members'])
+    expect(calls).toEqual(['DELETE /team/members/13800138000', 'GET /team/members', 'GET /team/accounts'])
 
     const refused = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
       fetcher: fetchReply([], () => ({ status: 403, body: { code: 'forbidden', message: 'owner only' } })),
     })
     const refusedController = new WorkbenchController(refused.ctx as never, refused.fetcher)
     await expect(refusedController.unbindMember('13800138000')).resolves.toBe('owner only')
+  })
+
+  it('assigns roles directly by phone and refreshes the roster, surfacing failures', async () => {
+    const calls: string[] = []
+    const bench = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
+      fetcher: memberReads(calls),
+    })
+    const controller = new WorkbenchController(bench.ctx as never, bench.fetcher)
+
+    await expect(controller.assignMember('13800138000', ['legal', 'audit'])).resolves.toBeNull()
+    expect(calls).toEqual(['PUT /team/members/13800138000', 'GET /team/members', 'GET /team/accounts'])
+
+    const refused = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
+      fetcher: fetchReply([], () => ({ status: 400, body: { code: 'no-account', message: 'this phone is not registered' } })),
+    })
+    const refusedController = new WorkbenchController(refused.ctx as never, refused.fetcher)
+    await expect(refusedController.assignMember('13700009999', ['accountant']))
+      .resolves.toBe('this phone is not registered')
+  })
+
+  it('deletes an account by phone and refreshes both lists, surfacing failures', async () => {
+    const calls: string[] = []
+    const bench = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
+      fetcher: memberReads(calls),
+    })
+    const controller = new WorkbenchController(bench.ctx as never, bench.fetcher)
+
+    await expect(controller.deleteAccount('13800138000')).resolves.toBeNull()
+    expect(calls).toEqual(['DELETE /team/accounts/13800138000', 'GET /team/members', 'GET /team/accounts'])
+
+    const refused = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
+      fetcher: fetchReply([], () => ({
+        status: 403,
+        body: { code: 'forbidden', message: 'the owner account cannot be deleted' },
+      })),
+    })
+    const refusedController = new WorkbenchController(refused.ctx as never, refused.fetcher)
+    await expect(refusedController.deleteAccount('13900139000'))
+      .resolves.toBe('the owner account cannot be deleted')
+  })
+})
+
+describe('clients-page round trips', () => {
+  /** One stored client row shaped like the host read. */
+  const CLIENT = {
+    id: 'C-2026-0001', nameCn: 'ABC 贸易有限公司', incorporationDate: '2024-03-15',
+    complianceStatus: 'green' as const, createdAt: 1, openObligations: 1, openDeliveries: 0,
+  }
+  /** One stored obligation row shaped like the host read. */
+  const OBLIGATION = {
+    id: 'o1', clientId: 'C-2026-0001', clientNameCn: 'ABC 贸易有限公司', kind: 'NAR1' as const,
+    periodLabel: '2026', dueDate: '2026-03-15', status: 'open' as const, createdAt: 1,
+    daysUntilDue: 30, dueTier: 'd30' as const,
+  }
+
+  /** One stored delivery row shaped like the host read. */
+  const DELIVERY = {
+    id: 'd1', clientId: 'C-2026-0001', clientNameCn: 'ABC 贸易有限公司', title: '2026 年报 NAR1 套装',
+    channel: 'email' as const, status: 'sent' as const, createdAt: 1, daysSinceSent: 7, followUpTier: 'chase' as const,
+  }
+
+  /** One follow-up-center row shaped like the host read. */
+  const FOLLOW_UP = {
+    id: 'delivery:d1', targetKind: 'delivery' as const, targetId: 'd1', clientId: 'C-2026-0001',
+    clientNameCn: 'ABC 贸易有限公司', title: '2026 年报 NAR1 套装', tier: 'chase' as const,
+    suggestedChannel: 'wechat' as const, days: 7, message: '催办话术', reminderCount: 0,
+  }
+
+  /** Workbench remote doubles answering the quintuple the clients page reads. */
+  function clientsWorkbench(over: {
+    clients?: unknown
+    obligations?: unknown
+    schedule?: unknown
+    deliveries?: unknown
+    followUps?: unknown
+  } = {}): Record<string, () => Promise<unknown>> {
+    return {
+      clients: () => Promise.resolve({ ok: true as const, value: { clients: over.clients ?? [CLIENT] } }),
+      obligations: () => Promise.resolve({ ok: true as const, value: { obligations: over.obligations ?? [OBLIGATION] } }),
+      complianceSchedule: () => Promise.resolve({
+        ok: true as const,
+        value: { year: '2026', rows: over.schedule ?? [] },
+      }),
+      deliveries: () => Promise.resolve({ ok: true as const, value: { deliveries: over.deliveries ?? [] } }),
+      followUps: () => Promise.resolve({ ok: true as const, value: { followUps: over.followUps ?? [] } }),
+    }
+  }
+
+  it('reads the master, the ledger, the schedule, the deliveries, and the follow-up center into the clients snapshot', async () => {
+    const bench = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
+      workbench: clientsWorkbench({ deliveries: [DELIVERY], followUps: [FOLLOW_UP] }),
+    })
+    const controller = new WorkbenchController(bench.ctx as never, bench.fetcher)
+    await controller.loadClients()
+
+    expect(controller.clients.getSnapshot()).toMatchObject({
+      status: 'ready', error: null, clients: [CLIENT], obligations: [OBLIGATION],
+      deliveries: [DELIVERY], followUps: [FOLLOW_UP],
+    })
+    expect(controller.clients.getSnapshot().schedule).toMatchObject({ year: '2026' })
+    expect(bench.calls).toEqual([
+      'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps',
+    ])
+  })
+
+  it('fails the whole clients read when any of the five answers refuses', async () => {
+    const bench = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
+      workbench: {
+        ...clientsWorkbench(),
+        obligations: () => Promise.resolve({
+          ok: false as const,
+          error: { code: 'gateway/internal', message: 'ledger boom' },
+        }),
+      },
+    })
+    const controller = new WorkbenchController(bench.ctx as never, bench.fetcher)
+    await controller.loadClients()
+
+    expect(controller.clients.getSnapshot()).toMatchObject({ status: 'error', error: 'ledger boom' })
+  })
+
+  it('adds a client and refreshes the page from the host, surfacing refusals with the wire code', async () => {
+    const bench = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
+      workbench: {
+        ...clientsWorkbench(),
+        addClient: () => Promise.resolve({ ok: true as const, value: { client: CLIENT } }),
+      },
+    })
+    const controller = new WorkbenchController(bench.ctx as never, bench.fetcher)
+    const payload = { nameCn: 'ABC 贸易有限公司', incorporationDate: '2024-03-15' } as const
+
+    await expect(controller.addClient(payload)).resolves.toEqual({ ok: true })
+    expect(bench.calls).toEqual([
+      'workbench.addClient',
+      'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps',
+    ])
+
+    const refused = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
+      workbench: {
+        ...clientsWorkbench(),
+        addClient: () => Promise.resolve({
+          ok: false as const,
+          error: { code: 'workbench/invalid-field', message: 'nameCn must not be empty' },
+        }),
+      },
+    })
+    const refusedController = new WorkbenchController(refused.ctx as never, refused.fetcher)
+    await expect(refusedController.addClient(payload)).resolves.toEqual({
+      ok: false, code: 'workbench/invalid-field', error: 'nameCn must not be empty',
+    })
+  })
+
+  it('records, marks, and removes obligations; removes a client with its obligations', async () => {
+    const ok = () => Promise.resolve({ ok: true as const, value: undefined })
+    const bench = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
+      workbench: {
+        ...clientsWorkbench(),
+        addObligation: ok,
+        markObligation: ok,
+        removeObligation: ok,
+        removeClient: ok,
+      },
+    })
+    const controller = new WorkbenchController(bench.ctx as never, bench.fetcher)
+
+    await expect(controller.addObligation({
+      clientId: 'C-2026-0001', kind: 'ITR', periodLabel: '2026', dueDate: '2026-04-30',
+    })).resolves.toEqual({ ok: true })
+    await expect(controller.markObligation('o1', 'submitted')).resolves.toEqual({ ok: true })
+    await expect(controller.removeObligation('o1')).resolves.toEqual({ ok: true })
+    await expect(controller.removeClient('C-2026-0001')).resolves.toEqual({ ok: true })
+
+    expect(bench.calls.filter(call => call.startsWith('workbench.'))).toEqual([
+      'workbench.addObligation', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps',
+      'workbench.markObligation', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps',
+      'workbench.removeObligation', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps',
+      'workbench.removeClient', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps',
+    ])
+
+    const refused = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
+      workbench: {
+        ...clientsWorkbench(),
+        markObligation: () => Promise.resolve({
+          ok: false as const,
+          error: { code: 'workbench/obligation-not-found', message: 'no such row' },
+        }),
+      },
+    })
+    const refusedController = new WorkbenchController(refused.ctx as never, refused.fetcher)
+    await expect(refusedController.markObligation('ghost', 'open')).resolves.toEqual({
+      ok: false, code: 'workbench/obligation-not-found', error: 'no such row',
+    })
+  })
+
+  it('records, marks, and removes a delivery, surfacing refusals with the wire code', async () => {
+    const ok = () => Promise.resolve({ ok: true as const, value: undefined })
+    const bench = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
+      workbench: {
+        ...clientsWorkbench(),
+        addDelivery: ok,
+        markDelivery: ok,
+        removeDelivery: ok,
+      },
+    })
+    const controller = new WorkbenchController(bench.ctx as never, bench.fetcher)
+
+    await expect(controller.addDelivery({ clientId: 'C-2026-0001', title: '2026 年报 NAR1 套装' })).resolves.toEqual({ ok: true })
+    await expect(controller.markDelivery('d1', 'signed')).resolves.toEqual({ ok: true })
+    await expect(controller.removeDelivery('d1')).resolves.toEqual({ ok: true })
+
+    expect(bench.calls.filter(call => call.startsWith('workbench.'))).toEqual([
+      'workbench.addDelivery', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps',
+      'workbench.markDelivery', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps',
+      'workbench.removeDelivery', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps',
+    ])
+
+    const refused = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
+      workbench: {
+        ...clientsWorkbench(),
+        markDelivery: () => Promise.resolve({
+          ok: false as const,
+          error: { code: 'workbench/delivery-not-found', message: 'no such delivery' },
+        }),
+      },
+    })
+    const refusedController = new WorkbenchController(refused.ctx as never, refused.fetcher)
+    await expect(refusedController.markDelivery('ghost', 'viewed')).resolves.toEqual({
+      ok: false, code: 'workbench/delivery-not-found', error: 'no such delivery',
+    })
+  })
+
+  it('logs a follow-up reminder and refreshes the page, surfacing refusals with the wire code', async () => {
+    const ok = () => Promise.resolve({ ok: true as const, value: undefined })
+    const bench = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
+      workbench: {
+        ...clientsWorkbench(),
+        recordFollowUp: ok,
+      },
+    })
+    const controller = new WorkbenchController(bench.ctx as never, bench.fetcher)
+
+    await expect(controller.recordFollowUp({ targetKind: 'delivery', targetId: 'd1' })).resolves.toEqual({ ok: true })
+    expect(bench.calls.filter(call => call.startsWith('workbench.'))).toEqual([
+      'workbench.recordFollowUp', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps',
+    ])
+
+    const refused = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
+      workbench: {
+        ...clientsWorkbench(),
+        recordFollowUp: () => Promise.resolve({
+          ok: false as const,
+          error: { code: 'workbench/follow-up-not-open', message: 'already closed' },
+        }),
+      },
+    })
+    const refusedController = new WorkbenchController(refused.ctx as never, refused.fetcher)
+    await expect(refusedController.recordFollowUp({ targetKind: 'obligation', targetId: 'o1' })).resolves.toEqual({
+      ok: false, code: 'workbench/follow-up-not-open', error: 'already closed',
+    })
   })
 })

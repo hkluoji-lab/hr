@@ -19,6 +19,7 @@ import {
   IconAgentPresetOutline16,
   IconChevronDownOutline14,
   IconChevronRightOutline14,
+  IconDataOutline16,
   IconFolderClose16,
   IconListPenOutline16,
   IconPlayOutline16,
@@ -36,7 +37,7 @@ import { NS, type WorkbenchKey } from './locales.ts'
 import css from './WorkbenchNavAction.module.css'
 
 /** A surface a sidebar navigation entry activates. */
-export type WorkbenchNavTarget = 'hall' | 'assistant' | 'active' | 'team' | 'projects' | 'members'
+export type WorkbenchNavTarget = 'hall' | 'assistant' | 'active' | 'clients' | 'team' | 'projects' | 'members'
 
 /** Glyph, label, and the page each nav target drives (null = command). */
 const TARGETS: Record<WorkbenchNavTarget, {
@@ -47,6 +48,7 @@ const TARGETS: Record<WorkbenchNavTarget, {
   hall: { icon: IconListPenOutline16, label: 'nav.hall', page: 'hall' },
   assistant: { icon: IconSparkle16, label: 'nav.assistant', page: 'assistant' },
   active: { icon: IconPlayOutline16, label: 'nav.active', page: 'active' },
+  clients: { icon: IconDataOutline16, label: 'nav.clients', page: 'clients' },
   team: { icon: IconAgentPresetOutline16, label: 'nav.team', page: 'team' },
   projects: { icon: IconFolderClose16, label: 'nav.projects', page: null },
   members: { icon: IconUserOutline16, label: 'nav.members', page: 'members' },
@@ -84,15 +86,17 @@ export function WorkbenchNavAction({ wide, t, target, useActive, activate, openT
   const label = t(TARGETS[target].label)
   const Icon = TARGETS[target].icon
 
-  // The members page is the owner's management surface: the row stays
-  // registered like every nav row, but renders nothing for everyone else.
-  if (target === 'members' && !my.isOwner) return null
-
   // Expansion is this row's presentation state, not page state; everything
   // ships collapsed so the seat stays short enough to reach the sidebar's
   // settings footer without scrolling, and each chevron reveals on demand.
+  // Declared before the owner gate below so the hook order stays identical
+  // across the status load that flips `my.isOwner`.
   const [groupOpen, setGroupOpen] = useState(false)
   const [rolesOpen, setRolesOpen] = useState<ReadonlySet<RoleMeta['id']>>(() => new Set())
+
+  // The members page is the owner's management surface: the row stays
+  // registered like every nav row, but renders nothing for everyone else.
+  if (target === 'members' && !my.isOwner) return null
 
   const button = (
     <button

@@ -86,7 +86,7 @@ afterEach(async () => {
 })
 
 /** Boot webserver + storage + web-login rows through the real Loader. */
-async function boot(): Promise<string> {
+async function boot(options: { requireRegistrationCode?: boolean } = {}): Promise<string> {
   root = await mkdtemp(join(tmpdir(), 'dsh-web-login-'))
   storageRoot = await mkdtemp(join(tmpdir(), 'dsh-web-login-storage-'))
   const configPath = join(root, 'cordis.yml')
@@ -107,6 +107,9 @@ async function boot(): Promise<string> {
     '    codeCooldownSeconds: 60',
     '    codeValiditySeconds: 300',
     '    maxVerificationAttempts: 5',
+    ...(options.requireRegistrationCode === undefined
+      ? []
+      : [`    requireRegistrationCode: ${String(options.requireRegistrationCode)}`]),
     '',
   ].join('\n'))
 
@@ -172,10 +175,9 @@ function postJson(base: string, path: string, body: unknown): Promise<Response> 
   })
 }
 
-/** Register one phone with a password through the demo SMS flow. */
+/** Register one phone with a password through the password-only register route. */
 async function registerWithPassword(base: string, phone: string, password: string): Promise<void> {
-  const { code } = await sendCode(base, phone)
-  const reply = await postJson(base, '/auth/register', { phone, code, password })
+  const reply = await postJson(base, '/auth/register', { phone, password })
   expect(reply.status).toBe(200)
 }
 
@@ -203,7 +205,6 @@ describe('login page route', () => {
     expect(html).toContain('id="pwd-password"')
     expect(html).toContain('id="remember"')
     expect(html).toContain('id="forgot"')
-    expect(html).toContain('id="reg-code"')
     expect(html).toContain('id="reg-password"')
     expect(html).toContain('id="agree"')
     expect(html).toContain('/auth/password/login')
@@ -216,6 +217,24 @@ describe('login page route', () => {
     expect(head.status).toBe(200)
     expect(head.headers.get('content-type')).toBe('text/html; charset=utf-8')
     expect(await head.text()).toBe('')
+  })
+
+  it('renders the register form without a code field by default', async () => {
+    const base = await boot()
+    const html = await (await fetch(`${base}/login`)).text()
+    expect(html).not.toContain('id="reg-code"')
+    expect(html).not.toContain('id="reg-send"')
+    expect(html).toContain('无需短信验证码')
+    expect(html).toContain('var REG_CODE = false')
+  })
+
+  it('keeps the register code field when the deployment demands one', async () => {
+    const base = await boot({ requireRegistrationCode: true })
+    const html = await (await fetch(`${base}/login`)).text()
+    expect(html).toContain('id="reg-code"')
+    expect(html).toContain('id="reg-send"')
+    expect(html).not.toContain('无需短信验证码')
+    expect(html).toContain('var REG_CODE = true')
   })
 
   it('passes unauthenticated callers (401) and refuses fence rejections (403)', async () => {
@@ -373,13 +392,13 @@ describe('register route', () => {
   it('validates the wire and the password policy before any state changes', async () => {
     const base = await boot()
     const post = (body: unknown): Promise<Response> => postJson(base, '/auth/register', body)
-    expect((await post({ phone: '23800001234', code: '123456', password: 'secret123' })).status).toBe(400)
-    expect((await post({ phone: PHONE, code: '12345', password: 'secret123' })).status).toBe(400)
-    expect((await post({ phone: PHONE, code: '123456', password: 'short1' })).status).toBe(400)
-    expect((await post({ phone: PHONE, code: '123456', password: 'nodigitsatall' })).status).toBe(400)
-    expect((await post({ phone: PHONE, code: '123456', password: '12345678' })).status).toBe(400)
-    expect((await post({ phone: PHONE, code: '123456', password: `${'a1'.repeat(32)}x` })).status).toBe(400)
-    const weak = await post({ phone: PHONE, code: '123456', password: 'short1' })
+    expect((await post({ phone: '23800001234', password: 'secret123' })).status).toBe(400)
+    expect((await post({ phone: PHONE })).status).toBe(400)
+    expect((await post({ phone: PHONE, password: 'short1' })).status).toBe(400)
+    expect((await post({ phone: PHONE, password: 'nodigitsatall' })).status).toBe(400)
+    expect((await post({ phone: PHONE, password: '12345678' })).status).toBe(400)
+    expect((await post({ phone: PHONE, password: `${'a1'.repeat(32)}x` })).status).toBe(400)
+    const weak = await post({ phone: PHONE, password: 'short1' })
     expect(await weak.json()).toMatchObject({ code: 'weak-password' })
     // Refused before any account or credential write.
     const stored = await readFile(join(storageRoot!, 'web_login.json'), 'utf8').catch(() => '')
@@ -389,19 +408,14 @@ describe('register route', () => {
   it('refuses an already-registered phone before touching the challenge', async () => {
     const base = await boot()
     await registerWithPassword(base, PHONE, 'secret123')
-    const duplicate = await postJson(base, '/auth/register', { phone: PHONE, code: '123456', password: 'secret123' })
+    const duplicate = await postJson(base, '/auth/register', { phone: PHONE, password: 'secret123' })
     expect(duplicate.status).toBe(409)
     expect(await duplicate.json()).toMatchObject({ code: 'phone-registered' })
   })
 
-  it('requires a live challenge and registers with a hashed credential', async () => {
+  it('registers from a phone and a password alone and hashes the credential', async () => {
     const base = await boot()
-    const missing = await postJson(base, '/auth/register', { phone: PHONE, code: '123456', password: 'secret123' })
-    expect(missing.status).toBe(400)
-    expect(await missing.json()).toMatchObject({ code: 'no-challenge' })
-
-    const { code } = await sendCode(base, PHONE)
-    const registered = await postJson(base, '/auth/register', { phone: PHONE, code, password: 'secret123' })
+    const registered = await postJson(base, '/auth/register', { phone: PHONE, password: 'secret123' })
     expect(registered.status).toBe(200)
     expect(await registered.json()).toEqual({ ok: true, redirect: '/' })
     expect(trust.issued).toEqual([PHONE])
@@ -415,6 +429,26 @@ describe('register route', () => {
     // The credential answers the password login route immediately.
     const login = await postJson(base, '/auth/password/login', { phone: PHONE, password: 'secret123' })
     expect(login.status).toBe(200)
+  })
+
+  it('demands a live challenge when requireRegistrationCode is set', async () => {
+    const base = await boot({ requireRegistrationCode: true })
+    const missing = await postJson(base, '/auth/register', { phone: PHONE, password: 'secret123' })
+    expect(missing.status).toBe(400)
+    expect(await missing.json()).toMatchObject({ code: 'bad-request' })
+
+    const withoutChallenge = await postJson(base, '/auth/register', {
+      phone: PHONE, code: '123456', password: 'secret123',
+    })
+    expect(withoutChallenge.status).toBe(400)
+    expect(await withoutChallenge.json()).toMatchObject({ code: 'no-challenge' })
+
+    const { code } = await sendCode(base, PHONE)
+    const registered = await postJson(base, '/auth/register', { phone: PHONE, code, password: 'secret123' })
+    expect(registered.status).toBe(200)
+    expect(await registered.json()).toEqual({ ok: true, redirect: '/' })
+    expect(trust.issued).toEqual([PHONE])
+    expect(context?.loginSession.displayName()).toBe('138****1234')
   })
 })
 
@@ -530,6 +564,15 @@ describe('member invites and roster', () => {
   function post(base: string, path: string, body: string): Promise<Response> {
     return fetch(`${base}${path}`, {
       method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body,
+    })
+  }
+
+  /** PUT one JSON body to a member's `:phone` route. */
+  function put(base: string, phone: string, body: string): Promise<Response> {
+    return fetch(`${base}/team/members/${encodeURIComponent(phone)}`, {
+      method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body,
     })
@@ -702,6 +745,138 @@ describe('member invites and roster', () => {
     const status = await (await fetch(`${base}/auth/status`)).json() as { isOwner?: boolean }
     expect(status.isOwner).toBe(true)
   })
+
+  it('assigns roles directly to a registered account, replacing the set', async () => {
+    const base = await boot()
+    await register(base, OWNER)
+    await register(base, MEMBER)
+
+    // Seed one role through the invite flow, then replace it directly.
+    trust.subject = OWNER
+    const created = await post(base, '/team/invites', JSON.stringify({ roles: ['accountant'] }))
+    trust.subject = MEMBER
+    await post(base, '/team/invites/redeem', JSON.stringify({ code: (await created.json() as { code: string }).code }))
+
+    trust.subject = OWNER
+    const assigned = await put(base, MEMBER, JSON.stringify({ roles: ['legal', 'audit'] }))
+    expect(assigned.status).toBe(200)
+    expect(await assigned.json()).toEqual({ ok: true, phone: MEMBER, roles: ['legal', 'audit'] })
+
+    // Replacement, not union: the earlier accountant binding is gone.
+    trust.subject = MEMBER
+    expect(await (await fetch(`${base}/auth/status`)).json()).toEqual({
+      authenticated: true,
+      subject: MEMBER,
+      displayName: '139****5678',
+      roles: ['legal', 'audit'],
+    })
+
+    // The roster shows the fresh grant facts from the direct assignment.
+    trust.subject = OWNER
+    const roster = await (await fetch(`${base}/team/members`)).json() as {
+      members: { roles: string[]; grantedBy: string }[]
+    }
+    expect(roster.members).toHaveLength(1)
+    expect(roster.members[0]?.roles).toEqual(['legal', 'audit'])
+    expect(roster.members[0]?.grantedBy).toBe('138****1234')
+  })
+
+  it('guards direct assignment on the session, ownership, wire, and account', async () => {
+    const base = await boot()
+    await register(base, OWNER)
+    await register(base, MEMBER)
+
+    // Anonymous and non-owner callers are refused before anything else.
+    expect((await put(base, MEMBER, '{"roles":["accountant"]}')).status).toBe(401)
+    trust.subject = MEMBER
+    expect((await put(base, MEMBER, '{"roles":["accountant"]}')).status).toBe(403)
+
+    trust.subject = OWNER
+    expect((await put(base, 'not-a-phone', '{"roles":["accountant"]}')).status).toBe(400)
+    expect((await put(base, MEMBER, '{"roles":[]}')).status).toBe(400)
+    expect((await put(base, MEMBER, '{"roles":["boss"]}')).status).toBe(400)
+    // The owner's binding is implicit in ownership itself, like the unbind refusal.
+    expect((await put(base, OWNER, '{"roles":["accountant"]}')).status).toBe(403)
+    // Assignment targets registered accounts only, so a typo cannot mint a member.
+    const missing = await put(base, '13700009999', '{"roles":["accountant"]}')
+    expect(missing.status).toBe(400)
+    expect(await missing.json()).toEqual({ code: 'no-account', message: 'this phone is not registered' })
+  })
+
+  it('lists every registered account for the owner, bound or not', async () => {
+    const base = await boot()
+    await register(base, OWNER)
+    vi.setSystemTime(Date.now() + 1000)
+    await register(base, MEMBER)
+
+    expect((await fetch(`${base}/team/accounts`)).status).toBe(401)
+    trust.subject = MEMBER
+    expect((await fetch(`${base}/team/accounts`)).status).toBe(403)
+
+    trust.subject = OWNER
+    const listed = await fetch(`${base}/team/accounts`)
+    expect(listed.status).toBe(200)
+    const reply = await listed.json() as {
+      ok: true
+      owner: string
+      accounts: { phone: string; displayName: string; createdAt: number; lastLoginAt: number }[]
+    }
+    expect(reply.ok).toBe(true)
+    expect(reply.owner).toBe(OWNER)
+    // Registration order, and both accounts appear although neither bound a role:
+    // a roster row exists only after a grant, so this is the only list that can
+    // reach an account that never held one.
+    expect(reply.accounts.map(entry => entry.phone)).toEqual([OWNER, MEMBER])
+    expect(reply.accounts.map(entry => entry.displayName)).toEqual(['138****1234', '139****5678'])
+    expect(reply.accounts[0]?.createdAt).toBeLessThan(reply.accounts[1]?.createdAt ?? 0)
+    expect(reply.accounts[1]?.lastLoginAt).toBeGreaterThan(0)
+
+    const wrongMethod = await fetch(`${base}/team/accounts`, { method: 'PUT' })
+    expect(wrongMethod.status).toBe(405)
+    expect(wrongMethod.headers.get('allow')).toBe('GET')
+  })
+
+  it('deletes an account with its credential and binding, refusing the owner and unknown phones', async () => {
+    const base = await boot()
+    await registerWithPassword(base, OWNER, 'secret123')
+    await registerWithPassword(base, MEMBER, 'secret123')
+    trust.subject = OWNER
+    await put(base, MEMBER, JSON.stringify({ roles: ['accountant'] }))
+
+    const remove = (phone: string, method = 'DELETE'): Promise<Response> =>
+      fetch(`${base}/team/accounts/${encodeURIComponent(phone)}`, { method })
+    const phones = async (): Promise<string[]> =>
+      ((await (await fetch(`${base}/team/accounts`)).json()) as { accounts: { phone: string }[] })
+        .accounts.map(entry => entry.phone)
+
+    // Anonymous and non-owner callers manage nothing.
+    trust.subject = undefined
+    expect((await remove(MEMBER)).status).toBe(401)
+    trust.subject = MEMBER
+    expect((await remove(MEMBER)).status).toBe(403)
+    expect((await remove(MEMBER, 'POST')).status).toBe(403)
+
+    trust.subject = OWNER
+    const wrongMethod = await remove(MEMBER, 'POST')
+    expect(wrongMethod.status).toBe(405)
+    expect(wrongMethod.headers.get('allow')).toBe('DELETE')
+    expect((await remove('not-a-phone')).status).toBe(400)
+    // Ownership derives from the earliest account, so the owner cannot delete itself.
+    expect((await remove(OWNER)).status).toBe(403)
+    const missing = await remove('13700009999')
+    expect(missing.status).toBe(400)
+    expect(await missing.json()).toEqual({ code: 'no-account', message: 'this phone is not registered' })
+
+    expect((await remove(MEMBER)).status).toBe(204)
+    expect(await phones()).toEqual([OWNER])
+    // The role binding went with the account.
+    const roster = await (await fetch(`${base}/team/members`)).json() as { members: unknown[] }
+    expect(roster.members).toEqual([])
+    // The credential went with it, and the freed phone can register afresh.
+    expect((await postJson(base, '/auth/password/login', { phone: MEMBER, password: 'secret123' })).status).toBe(400)
+    await registerWithPassword(base, MEMBER, 'secret123')
+    expect(await phones()).toEqual([OWNER, MEMBER])
+  })
 })
 
 describe('trust fence and disposal', () => {
@@ -720,6 +895,8 @@ describe('trust fence and disposal', () => {
     expect((await fetch(`${base}/team/invites/redeem`, { method: 'POST' })).status).toBe(403)
     expect((await fetch(`${base}/team/members`)).status).toBe(403)
     expect((await fetch(`${base}/team/members/13800001234`, { method: 'DELETE' })).status).toBe(403)
+    expect((await fetch(`${base}/team/accounts`)).status).toBe(403)
+    expect((await fetch(`${base}/team/accounts/13800001234`, { method: 'DELETE' })).status).toBe(403)
   })
 
   it('removes every route when the plugin fiber is disposed (HMR safety)', async () => {
@@ -740,5 +917,7 @@ describe('trust fence and disposal', () => {
     expect((await fetch(`${base}/team/invites/redeem`, { method: 'POST' })).status).toBe(404)
     expect((await fetch(`${base}/team/members`)).status).toBe(404)
     expect((await fetch(`${base}/team/members/13800001234`, { method: 'DELETE' })).status).toBe(404)
+    expect((await fetch(`${base}/team/accounts`)).status).toBe(404)
+    expect((await fetch(`${base}/team/accounts/13800001234`, { method: 'DELETE' })).status).toBe(404)
   })
 })

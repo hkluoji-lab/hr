@@ -59,6 +59,7 @@ export const strings = {
     hidePassword: '隐藏密码',
     labelInvite: '邀请码（选填）',
     invitePlaceholder: '持有团队邀请码请填写',
+    noCodeHint: '无需短信验证码，填写手机号与密码即可注册',
     submitPassword: '登录',
     submitting: '登录中…',
     submitRegister: '注册并登录',

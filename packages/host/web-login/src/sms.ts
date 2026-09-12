@@ -100,7 +100,11 @@ export class SmsChallengeStore {
     return { outcome: 'ok' }
   }
 
-  /** Terminal outcomes as a test-observable predicate. */
+  /**
+   * Terminal outcomes as a test-observable predicate.
+   * @param outcome - the verification outcome to classify.
+   * @returns `true` when the challenge can no longer be verified.
+   */
   static isTerminal(outcome: SmsVerifyOutcome): boolean {
     return TERMINAL_OUTCOMES.includes(outcome.outcome)
   }

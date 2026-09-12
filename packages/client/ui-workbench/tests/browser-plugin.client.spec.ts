@@ -190,13 +190,13 @@ describe('ui-workbench browser half', () => {
     expect(entries[0]!.component).toBe(WorkbenchDashboard)
     expect(dashboardIds(ctx)).toContain('workbench')
 
-    // Six additive sidebar nav entries ride the same plugin fiber, in the
-    // design's order: task hall, task assistant, active tasks, AI team,
-    // projects, and the owner-only members management.
+    // Seven additive sidebar nav entries ride the same plugin fiber, in the
+    // design's order: task hall, task assistant, active tasks, clients &
+    // filings, AI team, projects, and the owner-only members management.
     expect(ctx.slots.entries('sidebar.nav').map(entry => entry.options.id))
       .toEqual([
         'workbench-hall', 'workbench-assistant', 'workbench-active',
-        'workbench-team', 'workbench-projects', 'workbench-members',
+        'workbench-clients', 'workbench-team', 'workbench-projects', 'workbench-members',
       ])
 
     // The two deployment-brand occupants replace the shell brand fallbacks.

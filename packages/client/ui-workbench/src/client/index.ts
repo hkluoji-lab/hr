@@ -1,9 +1,9 @@
 /**
  * Workbench plugin, browser half: the blank-session hero's
  * `conversation.hero.dashboard` entry (greeting, quick actions, team roster),
- * additive `sidebar.nav` entries (task hall, task assistant, active tasks, AI
- * team, projects, and the owner-only members management), and the
- * `shell.overlay` page surface they open. One controller backs all of them so
+ * additive `sidebar.nav` entries (task hall, task assistant, active tasks, the
+ * secretary-company clients page, AI team, projects, and the owner-only
+ * members management), and the `shell.overlay` page surface they open. One controller backs all of them so
  * a nav entry and a hero shortcut drive the same page state, and the
  * right-Sidebar tabs read the same snapshots. The roster arrives through one
  * `agentPresets.list` Remote call, the caller's role binding through one
@@ -55,8 +55,8 @@ export type { WorkbenchDashboardProps, WorkbenchInjected } from './WorkbenchDash
 export type { WorkbenchNavActionProps, WorkbenchNavInjected, WorkbenchNavTarget } from './WorkbenchNavAction.tsx'
 export type { WorkbenchShellProps, WorkbenchShellInjected } from './WorkbenchShell.tsx'
 export type {
-  InviteOutcome, LedgerState, MembersState, MonthReport, MyStatus, TaskRow,
-  WorkbenchPageId, WorkbenchPagesState,
+  ClientsState, InviteOutcome, LedgerState, MembersState, MonthReport, MutationOutcome, MyStatus,
+  TaskRow, WorkbenchPageId, WorkbenchPagesState,
 } from './workbench-store.ts'
 export type { TeamMember, TeamMemberState, WorkbenchState } from './workbench-store.ts'
 export type { CreditsTabProps } from './tabs/CreditsTab.tsx'
@@ -71,7 +71,7 @@ export const inject = [
 ]
 
 /** Sidebar nav entries in the design's display order; each id is `workbench-<target>`. */
-const NAV_TARGETS: readonly WorkbenchNavTarget[] = ['hall', 'assistant', 'active', 'team', 'projects', 'members']
+const NAV_TARGETS: readonly WorkbenchNavTarget[] = ['hall', 'assistant', 'active', 'clients', 'team', 'projects', 'members']
 
 /**
  * Mount the workbench dashboard on the blank-session hero.
@@ -150,11 +150,13 @@ export function apply(ctx: ClientContext): void {
         workbench: controller.store,
         ledger: controller.ledger,
         members: controller.members,
+        clients: controller.clients,
       },
       useTasks,
       load: () => controller.load(),
       loadLedger: () => controller.loadLedger(),
       loadMembers: () => controller.loadMembers(),
+      loadClients: () => controller.loadClients(),
       close: () => { controller.closePage() },
       openSession: (id) => { controller.openSession(id) },
       startWithPreset: (id: string) => { controller.startWithPreset(id) },
@@ -162,6 +164,17 @@ export function apply(ctx: ClientContext): void {
       grantCredits: (amount, reason) => controller.grantCredits(amount, reason),
       createInvite: roles => controller.createInvite(roles),
       unbindMember: phone => controller.unbindMember(phone),
+      assignMember: (phone, roles) => controller.assignMember(phone, roles),
+      deleteAccount: phone => controller.deleteAccount(phone),
+      addClient: payload => controller.addClient(payload),
+      removeClient: id => controller.removeClient(id),
+      addObligation: payload => controller.addObligation(payload),
+      markObligation: (id, status) => controller.markObligation(id, status),
+      removeObligation: id => controller.removeObligation(id),
+      addDelivery: payload => controller.addDelivery(payload),
+      markDelivery: (id, status) => controller.markDelivery(id, status),
+      removeDelivery: id => controller.removeDelivery(id),
+      recordFollowUp: payload => controller.recordFollowUp(payload),
     })
 
     scope.effect(() => {

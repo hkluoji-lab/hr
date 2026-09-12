@@ -3,24 +3,26 @@
  * The workbench page surface: the hall's rows, the active-tasks filter, the
  * task assistant's brief form, the team grid, the report's
  * metrics/ledger/grant form, the owner's member management (invites, roster,
- * unbind), and the shell that hosts them — closed state, Escape/close
- * dismissal, and the reads an open page triggers.
+ * unbind, account deletion), the secretary-company clients page (schedule,
+ * master, filing ledger), and the shell that hosts them — closed state,
+ * Escape/close dismissal, and the reads an open page triggers.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, act, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
-import type { MemberListEntry } from '@deepseek-ai/dsh-web-login/shared'
+import type { AccountEntry, MemberListEntry } from '@deepseek-ai/dsh-web-login/shared'
 import {
   WorkbenchShell, createTaskRowsHook, type WorkbenchShellProps,
 } from '../src/client/WorkbenchShell.tsx'
 import { AssistantPage, type AssistantPageProps } from '../src/client/pages/AssistantPage.tsx'
+import { ClientsPage, type ClientsPageProps } from '../src/client/pages/ClientsPage.tsx'
 import { MembersPage, type MembersPageProps } from '../src/client/pages/MembersPage.tsx'
 import { TaskHallPage, type TaskHallPageProps } from '../src/client/pages/TaskHallPage.tsx'
 import { TeamPage } from '../src/client/pages/TeamPage.tsx'
 import { ReportPage, type ReportPageProps } from '../src/client/pages/ReportPage.tsx'
 import type {
-  InviteOutcome, LedgerState, MembersState, TaskRow, TeamMember, WorkbenchPagesState,
-  WorkbenchState,
+  ClientsState, InviteOutcome, LedgerState, MembersState, MutationOutcome, TaskRow, TeamMember,
+  WorkbenchPagesState, WorkbenchState,
 } from '../src/client/workbench-store.ts'
 import { ROLES } from '../src/client/roles.ts'
 import { zh } from '../src/client/locales.ts'
@@ -42,6 +44,11 @@ const READY: WorkbenchState = {
   userName: null,
   my: { name: null, roles: [], isOwner: false },
   todayCount: 2, runningCount: 1, doneCount: 1,
+}
+
+/** The clients snapshot the shell's useClients stub binds: nothing stored yet. */
+const EMPTY_CLIENTS: ClientsState = {
+  status: 'ready', error: null, clients: [], obligations: [], schedule: null, deliveries: [], followUps: [],
 }
 
 /** One hall row shaped like the fold's product. */
@@ -327,11 +334,29 @@ describe('MembersPage', () => {
     grantedBy: '139****9000', grantedAt: 0,
   }
 
+  /** The roster entry's account, so its row joins the bound role back from the roster. */
+  const ACCOUNT: AccountEntry = {
+    phone: ENTRY.phone, displayName: ENTRY.displayName, createdAt: 0, lastLoginAt: 0,
+  }
+
+  /** A registered account that never bound a role, so it has no roster row. */
+  const UNBOUND: AccountEntry = {
+    phone: '13700137000', displayName: '137****7000', createdAt: 0, lastLoginAt: 0,
+  }
+
+  /** The owner's phone, distinct from both accounts above so their rows stay deletable. */
+  const OWNER = '13900139000'
+
   /** Roster snapshot fixtures for the three read lifecycles the page renders. */
   const ROSTER: Record<'ready' | 'loading' | 'error', MembersState> = {
-    ready: { status: 'ready', error: null, members: [ENTRY] },
-    loading: { status: 'loading', error: null, members: [] },
-    error: { status: 'error', error: 'owner only', members: [] },
+    ready: { status: 'ready', error: null, owner: '', members: [ENTRY], accounts: [] },
+    loading: { status: 'loading', error: null, owner: '', members: [], accounts: [] },
+    error: { status: 'error', error: 'owner only', owner: '', members: [], accounts: [] },
+  }
+
+  /** The ready snapshot with the owner and the given accounts in place. */
+  function withAccounts(owner: string, accounts: readonly AccountEntry[]): MembersState {
+    return { ...ROSTER.ready, owner, accounts }
   }
 
   function props(over: Partial<MembersPageProps> = {}): MembersPageProps {
@@ -340,6 +365,8 @@ describe('MembersPage', () => {
       onCreate: vi.fn((): Promise<InviteOutcome> =>
         Promise.resolve({ ok: true, code: 'AB_cd12', expiresAt: 1_800_000_000_000 })),
       onUnbind: vi.fn((): Promise<string | null> => Promise.resolve(null)),
+      onAssign: vi.fn((): Promise<string | null> => Promise.resolve(null)),
+      onDelete: vi.fn((): Promise<string | null> => Promise.resolve(null)),
       t,
       ...over,
     }
@@ -347,8 +374,10 @@ describe('MembersPage', () => {
 
   it('renders the invite form with the four role checks and the empty-roster notes', () => {
     render(<MembersPage {...props({ members: ROSTER.loading })} />)
+    const inviteGroup = screen.getByRole('group', { name: zh['members.roles'] })
     for (const role of ROLES) {
-      expect(screen.getByRole('checkbox', { name: new RegExp(zh[`nav.role.${role.id}`]) })).toBeTruthy()
+      expect(within(inviteGroup).getByRole('checkbox', { name: new RegExp(zh[`nav.role.${role.id}`]) }))
+        .toBeTruthy()
     }
     expect(screen.getByText(zh['members.invite.none'])).toBeTruthy()
     expect(screen.getByText(zh['members.list.loading'])).toBeTruthy()
@@ -360,9 +389,10 @@ describe('MembersPage', () => {
     const onCreate = vi.fn((): Promise<InviteOutcome> =>
       Promise.resolve({ ok: true, code: 'AB_cd12', expiresAt: 1_800_000_000_000 }))
     render(<MembersPage {...props({ onCreate })} />)
+    const inviteGroup = screen.getByRole('group', { name: zh['members.roles'] })
 
-    fireEvent.click(screen.getByRole('checkbox', { name: new RegExp(zh['nav.role.accountant']) }))
-    fireEvent.click(screen.getByRole('checkbox', { name: new RegExp(zh['nav.role.legal']) }))
+    fireEvent.click(within(inviteGroup).getByRole('checkbox', { name: new RegExp(zh['nav.role.accountant']) }))
+    fireEvent.click(within(inviteGroup).getByRole('checkbox', { name: new RegExp(zh['nav.role.legal']) }))
     fireEvent.click(screen.getByRole('button', { name: zh['members.invite.create'] }))
 
     await vi.waitFor(() => {
@@ -376,8 +406,9 @@ describe('MembersPage', () => {
   it('shows the host refusal when the invite fails', async () => {
     const onCreate = vi.fn((): Promise<InviteOutcome> => Promise.resolve({ ok: false, error: 'owner only' }))
     render(<MembersPage {...props({ onCreate })} />)
+    const inviteGroup = screen.getByRole('group', { name: zh['members.roles'] })
 
-    fireEvent.click(screen.getByRole('checkbox', { name: new RegExp(zh['nav.role.secretary']) }))
+    fireEvent.click(within(inviteGroup).getByRole('checkbox', { name: new RegExp(zh['nav.role.secretary']) }))
     fireEvent.click(screen.getByRole('button', { name: zh['members.invite.create'] }))
 
     await vi.waitFor(() => {
@@ -420,6 +451,376 @@ describe('MembersPage', () => {
         .toBe(zh['members.unbind.failed'].replace('{message}', 'owner only'))
     })
   })
+
+  it('assigns the checked roles to the typed phone and clears the form on success', async () => {
+    const onAssign = vi.fn((): Promise<string | null> => Promise.resolve(null))
+    render(<MembersPage {...props({ onAssign })} />)
+    const assignGroup = screen.getByRole('group', { name: zh['members.assign.title'] })
+    const submit = screen.getByRole('button', { name: zh['members.assign.submit'] })
+
+    expect(submit.hasAttribute('disabled')).toBe(true)
+    fireEvent.click(within(assignGroup).getByRole('checkbox', { name: new RegExp(zh['nav.role.legal']) }))
+    fireEvent.change(screen.getByLabelText(zh['members.assign.phone']), { target: { value: '13800138000' } })
+    fireEvent.click(submit)
+
+    await vi.waitFor(() => {
+      expect(onAssign).toHaveBeenCalledWith('13800138000', ['legal'])
+      // The reset shows up as the submit button going back to its disabled state.
+      expect(screen.getByRole('button', { name: zh['members.assign.submit'] }).hasAttribute('disabled'))
+        .toBe(true)
+    })
+  })
+
+  it('shows the host refusal when the direct assignment fails', async () => {
+    const onAssign = vi.fn((): Promise<string | null> => Promise.resolve('no-account'))
+    render(<MembersPage {...props({ onAssign })} />)
+    const assignGroup = screen.getByRole('group', { name: zh['members.assign.title'] })
+
+    fireEvent.click(within(assignGroup).getByRole('checkbox', { name: new RegExp(zh['nav.role.audit']) }))
+    fireEvent.change(screen.getByLabelText(zh['members.assign.phone']), { target: { value: '13700009999' } })
+    fireEvent.click(screen.getByRole('button', { name: zh['members.assign.submit'] }))
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole('alert').textContent)
+        .toBe(zh['members.assign.failed'].replace('{message}', 'no-account'))
+    })
+  })
+
+  it('lists every registered account, joining roles from the roster and noting the unbound', () => {
+    render(<MembersPage {...props({ members: withAccounts(OWNER, [ACCOUNT, UNBOUND]) })} />)
+
+    expect(screen.getByText(UNBOUND.displayName)).toBeTruthy()
+    // The account that never bound a role has no roster row, so its own row says so.
+    expect(screen.getByText(zh['members.accounts.unbound'])).toBeTruthy()
+    // The bound account's row joins the role back from the roster. `span` keeps
+    // the invite and assign forms' role checkboxes out of the match.
+    expect(screen.getAllByText(zh['nav.role.accountant'], { selector: 'span' }).length).toBe(2)
+    // Both account rows carry the registration and last-login times.
+    expect(screen.getAllByText((_, el) =>
+      el?.textContent?.startsWith(zh['members.accounts.registeredAt'].replace('{time}', '')) === true
+      && el.textContent.includes(zh['members.accounts.lastLoginAt'].replace('{time}', '')),
+    ).length).toBe(2)
+    expect(screen.getAllByRole('button', { name: zh['members.accounts.delete'] }).length).toBe(2)
+    expect(screen.getByText(zh['members.accounts.hint'])).toBeTruthy()
+  })
+
+  it('renders the owner row without a delete action', () => {
+    render(<MembersPage {...props({ members: withAccounts(ACCOUNT.phone, [ACCOUNT]) })} />)
+
+    expect(screen.getByText(zh['members.accounts.selfHint'])).toBeTruthy()
+    expect(screen.queryByRole('button', { name: zh['members.accounts.delete'] })).toBeNull()
+    // The roster's unbind action is independent of the account list.
+    expect(screen.getByRole('button', { name: zh['members.unbind'] })).toBeTruthy()
+  })
+
+  it('notes the account read lifecycles and the empty list', () => {
+    const loading = render(<MembersPage {...props({ members: ROSTER.loading })} />)
+    expect(screen.getByText(zh['members.accounts.loading'])).toBeTruthy()
+    loading.unmount()
+
+    const failed = render(<MembersPage {...props({ members: ROSTER.error })} />)
+    expect(screen.getByText(zh['members.accounts.error'].replace('{message}', 'owner only'))).toBeTruthy()
+    failed.unmount()
+
+    render(<MembersPage {...props()} />)
+    expect(screen.getByText(zh['members.accounts.empty'])).toBeTruthy()
+  })
+
+  it('deletes an account through the host and surfaces the refusal', async () => {
+    const onDelete = vi.fn((): Promise<string | null> => Promise.resolve(null))
+    const { unmount } = render(
+      <MembersPage {...props({ members: withAccounts(OWNER, [ACCOUNT]), onDelete })} />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: zh['members.accounts.delete'] }))
+    await vi.waitFor(() => { expect(onDelete).toHaveBeenCalledWith(ACCOUNT.phone) })
+    expect(screen.queryByRole('alert')).toBeNull()
+    unmount()
+
+    const refused = vi.fn((): Promise<string | null> => Promise.resolve('forbidden'))
+    render(<MembersPage {...props({ members: withAccounts(OWNER, [ACCOUNT]), onDelete: refused })} />)
+    fireEvent.click(screen.getByRole('button', { name: zh['members.accounts.delete'] }))
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole('alert').textContent)
+        .toBe(zh['members.accounts.delete.failed'].replace('{message}', 'forbidden'))
+    })
+  })
+})
+
+describe('ClientsPage', () => {
+  const CLIENT = {
+    id: 'C-2026-0001', nameCn: 'ABC 贸易有限公司', nameEn: 'ABC Trading Limited',
+    brNo: 'BR-7788', incorporationDate: '2024-03-15', complianceStatus: 'green' as const,
+    createdAt: 1, openObligations: 1, openDeliveries: 1,
+  }
+  const OBLIGATION = {
+    id: 'o1', clientId: 'C-2026-0001', clientNameCn: 'ABC 贸易有限公司', kind: 'NAR1' as const,
+    periodLabel: '2026', dueDate: '2026-03-15', status: 'open' as const, createdAt: 1,
+    daysUntilDue: 30, dueTier: 'd30' as const,
+  }
+  const DELIVERY = {
+    id: 'd1', clientId: 'C-2026-0001', clientNameCn: 'ABC 贸易有限公司', title: '2026 年报 NAR1 套装',
+    channel: 'email' as const, status: 'sent' as const, createdAt: 1, daysSinceSent: 7, followUpTier: 'chase' as const,
+  }
+  const FOLLOW_UP = {
+    id: 'delivery:d1', targetKind: 'delivery' as const, targetId: 'd1', clientId: 'C-2026-0001',
+    clientNameCn: 'ABC 贸易有限公司', title: '2026 年报 NAR1 套装', tier: 'chase' as const,
+    suggestedChannel: 'wechat' as const, days: 7, message: '催办话术草稿', reminderCount: 1, lastReminderAt: 2,
+  }
+  const CLIENTS: ClientsState = {
+    status: 'ready',
+    error: null,
+    clients: [CLIENT],
+    obligations: [OBLIGATION],
+    schedule: {
+      year: '2026',
+      rows: [
+        { clientId: 'C-2026-0001', clientNameCn: 'ABC 贸易有限公司', kind: 'NAR1', periodLabel: '2026', dueDate: '2026-03-15', status: 'open', source: 'ledger', dueTier: 'd30' },
+        { clientId: 'C-2026-0002', clientNameCn: '乙公司', kind: 'NAR1', periodLabel: '2026', dueDate: '2026-07-01', status: 'open', source: 'derived', dueTier: 'ok' },
+      ],
+    },
+    deliveries: [DELIVERY],
+    followUps: [FOLLOW_UP],
+  }
+
+  function props(over: Partial<ClientsPageProps> = {}): ClientsPageProps {
+    return {
+      clients: CLIENTS,
+      onAddClient: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
+      onRemoveClient: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
+      onAddObligation: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
+      onMarkObligation: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
+      onRemoveObligation: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
+      onAddDelivery: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
+      onMarkDelivery: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
+      onRemoveDelivery: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
+      onRecordFollowUp: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
+      t,
+      ...over,
+    }
+  }
+
+  it('renders the schedule with tiers and sources, the master, and the ledger', () => {
+    render(<ClientsPage {...props()} />)
+    expect(screen.getByText(zh['clients.schedule.title'].replace('{year}', '2026'))).toBeTruthy()
+    // The client name and the due tier repeat across the schedule, the master,
+    // and the ledger; assert presence, not uniqueness.
+    expect(screen.getAllByText('ABC 贸易有限公司').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(zh['clients.tier.d30']).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText(zh['clients.tier.ok'])).toBeTruthy()
+    expect(screen.getByText(zh['clients.source.derived'])).toBeTruthy()
+    expect(screen.getByText(zh['clients.source.ledger'])).toBeTruthy()
+    expect(screen.getByText('ABC Trading Limited')).toBeTruthy()
+    // The master row joins BR/CR/incorporation into one meta string.
+    expect(screen.getByText('BR BR-7788 · 成立于 2024-03-15')).toBeTruthy()
+    expect(screen.getByText(zh['clients.compliance.green'])).toBeTruthy()
+    expect(screen.getByText(`${zh['clients.master.openObligations'].replace('{n}', '1')} · ${zh['clients.master.openDeliveries'].replace('{n}', '1')}`)).toBeTruthy()
+    expect(screen.getByText(zh['clients.obligationStatus.open'])).toBeTruthy()
+  })
+
+  it('notes loading, error, and empty reads', () => {
+    const loading = render(<ClientsPage {...props({ clients: { ...CLIENTS, status: 'loading', schedule: null } })} />)
+    // The loading note renders in both the schedule and the master sections.
+    expect(screen.getAllByText(zh['clients.read.loading']).length).toBeGreaterThanOrEqual(1)
+    loading.unmount()
+
+    const failed = render(<ClientsPage {...props({
+      clients: { status: 'error', error: 'boom', clients: [], obligations: [], schedule: null, deliveries: [], followUps: [] },
+    })} />)
+    expect(screen.getAllByText(zh['clients.read.error'].replace('{message}', 'boom')).length)
+      .toBeGreaterThanOrEqual(1)
+    failed.unmount()
+
+    render(<ClientsPage {...props({
+      clients: { status: 'ready', error: null, clients: [], obligations: [], schedule: { year: '2026', rows: [] }, deliveries: [], followUps: [] },
+    })} />)
+    expect(screen.getByText(zh['clients.master.empty'])).toBeTruthy()
+    expect(screen.getByText(zh['clients.schedule.empty'])).toBeTruthy()
+    expect(screen.getByText(zh['clients.obligations.empty'])).toBeTruthy()
+    expect(screen.getByText(zh['clients.delivery.empty'])).toBeTruthy()
+    expect(screen.getByText(zh['clients.followUpCenter.empty'])).toBeTruthy()
+  })
+
+  it('adds a client with only the filled optional fields and clears the form', async () => {
+    const onAddClient = vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true }))
+    render(<ClientsPage {...props({ onAddClient })} />)
+    const submit = screen.getByRole('button', { name: zh['clients.add.submit'] })
+    expect(submit.hasAttribute('disabled')).toBe(true)
+
+    fireEvent.change(screen.getByLabelText(zh['clients.add.nameCn']), { target: { value: '  甲公司  ' } })
+    fireEvent.change(screen.getByLabelText(zh['clients.add.incorporation']), { target: { value: '2024-03-15' } })
+    fireEvent.change(screen.getByLabelText(zh['clients.add.brNo']), { target: { value: 'BR-9' } })
+    fireEvent.click(submit)
+
+    await vi.waitFor(() => {
+      expect(onAddClient).toHaveBeenCalledWith({
+        nameCn: '甲公司', brNo: 'BR-9', incorporationDate: '2024-03-15',
+      })
+    })
+    await waitFor(() => {
+      const nameInput = screen.getByLabelText(zh['clients.add.nameCn']) as HTMLInputElement
+      expect(nameInput.value).toBe('')
+    })
+  })
+
+  it('disables the submit until the name and date are present, and surfaces the host refusal', async () => {
+    const onAddClient = vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: false, code: null, error: 'nope' }))
+    render(<ClientsPage {...props({ onAddClient })} />)
+    const submit = screen.getByRole('button', { name: zh['clients.add.submit'] })
+
+    // Missing date keeps the control disabled, so a click cannot submit.
+    fireEvent.change(screen.getByLabelText(zh['clients.add.nameCn']), { target: { value: '甲公司' } })
+    expect(submit.hasAttribute('disabled')).toBe(true)
+    fireEvent.click(submit)
+    expect(onAddClient).not.toHaveBeenCalled()
+
+    fireEvent.change(screen.getByLabelText(zh['clients.add.incorporation']), { target: { value: '2024-03-15' } })
+    fireEvent.click(submit)
+    await vi.waitFor(() => {
+      expect(screen.getByRole('alert').textContent)
+        .toBe(zh['clients.add.failed'].replace('{message}', 'nope'))
+    })
+  })
+
+  it('removes a client and marks or removes an obligation row', async () => {
+    const onRemoveClient = vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true }))
+    const onMarkObligation = vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true }))
+    const onRemoveObligation = vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true }))
+    render(<ClientsPage {...props({ onRemoveClient, onMarkObligation, onRemoveObligation })} />)
+
+    // Both remove buttons read 删除; scope each query to its row.
+    const masterRow = screen.getByText(zh['clients.compliance.green']).closest('li')!
+    fireEvent.click(within(masterRow).getByRole('button', { name: zh['clients.master.remove'] }))
+    await vi.waitFor(() => { expect(onRemoveClient).toHaveBeenCalledWith('C-2026-0001') })
+
+    const ledgerRow = screen.getByText(zh['clients.obligationStatus.open']).closest('li')!
+    fireEvent.click(within(ledgerRow).getByRole('button', { name: zh['clients.obligations.mark'] }))
+    await vi.waitFor(() => { expect(onMarkObligation).toHaveBeenCalledWith('o1', 'submitted') })
+
+    fireEvent.click(within(ledgerRow).getByRole('button', { name: zh['clients.obligations.remove'] }))
+    await vi.waitFor(() => { expect(onRemoveObligation).toHaveBeenCalledWith('o1') })
+  })
+
+  it('records a filing against the chosen client and refuses an incomplete form locally', async () => {
+    const onAddObligation = vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true }))
+    render(<ClientsPage {...props({ onAddObligation })} />)
+    // The client label reads 客户 in both the obligation and the delivery form;
+    // scope every query to the obligation section.
+    const section = screen.getByText(zh['clients.obligations.title']).closest('section')!
+    const submit = within(section).getByRole('button', { name: zh['clients.obligations.record.submit'] })
+    expect(submit.hasAttribute('disabled')).toBe(true)
+
+    fireEvent.change(within(section).getByLabelText(zh['clients.obligations.record.client']), { target: { value: 'C-2026-0001' } })
+    fireEvent.change(within(section).getByLabelText(zh['clients.obligations.record.kind']), { target: { value: 'ITR' } })
+    fireEvent.change(within(section).getByLabelText(zh['clients.obligations.record.period']), { target: { value: '2026' } })
+    fireEvent.click(submit)
+    expect(onAddObligation).not.toHaveBeenCalled()
+
+    fireEvent.change(within(section).getByLabelText(zh['clients.obligations.record.due']), { target: { value: '2026-04-30' } })
+    fireEvent.click(submit)
+    await vi.waitFor(() => {
+      expect(onAddObligation).toHaveBeenCalledWith({
+        clientId: 'C-2026-0001', kind: 'ITR', periodLabel: '2026', dueDate: '2026-04-30',
+      })
+    })
+  })
+
+  it('renders the delivery ledger with channel, lifecycle, and follow-up tiers', () => {
+    render(<ClientsPage {...props()} />)
+    expect(screen.getByText(zh['clients.delivery.title'])).toBeTruthy()
+    expect(screen.getByText(zh['clients.deliveryStatus.sent'])).toBeTruthy()
+    // The days meta and the tier badge also render in the follow-up center's
+    // row; assert presence, not uniqueness.
+    expect(screen.getAllByText(zh['clients.delivery.days'].replace('{n}', '7')).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(zh['clients.followUp.chase']).length).toBeGreaterThanOrEqual(1)
+    // The channel badge and the form's channel option share the label text.
+    expect(screen.getAllByText(zh['clients.channel.email']).length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('records a delivery against the chosen client and refuses an incomplete form locally', async () => {
+    const onAddDelivery = vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true }))
+    render(<ClientsPage {...props({ onAddDelivery })} />)
+    // The client label reads 客户 in both the obligation and the delivery form;
+    // scope every query to the delivery section.
+    const section = screen.getByText(zh['clients.delivery.title']).closest('section')!
+    const submit = within(section).getByRole('button', { name: zh['clients.delivery.record.submit'] })
+    expect(submit.hasAttribute('disabled')).toBe(true)
+
+    fireEvent.change(within(section).getByLabelText(zh['clients.delivery.record.client']), { target: { value: 'C-2026-0001' } })
+    fireEvent.click(submit)
+    expect(onAddDelivery).not.toHaveBeenCalled()
+
+    fireEvent.change(within(section).getByLabelText(zh['clients.delivery.record.title']), { target: { value: '  年报套装  ' } })
+    fireEvent.change(within(section).getByLabelText(zh['clients.delivery.record.channel']), { target: { value: 'wechat' } })
+    fireEvent.click(submit)
+    await vi.waitFor(() => {
+      expect(onAddDelivery).toHaveBeenCalledWith({ clientId: 'C-2026-0001', title: '年报套装', channel: 'wechat' })
+    })
+  })
+
+  it('advances and removes a delivery row through its lifecycle', async () => {
+    const onMarkDelivery = vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true }))
+    const onRemoveDelivery = vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true }))
+    render(<ClientsPage {...props({ onMarkDelivery, onRemoveDelivery })} />)
+
+    // The tier badge repeats in the follow-up center; scope to the delivery ledger.
+    const section = screen.getByText(zh['clients.delivery.title']).closest('section')!
+    const deliveryRow = within(section).getByText(zh['clients.followUp.chase']).closest('li')!
+    fireEvent.click(within(deliveryRow).getByRole('button', { name: zh['clients.delivery.advance.viewed'] }))
+    await vi.waitFor(() => { expect(onMarkDelivery).toHaveBeenCalledWith('d1', 'viewed') })
+
+    fireEvent.click(within(deliveryRow).getByRole('button', { name: zh['clients.delivery.remove'] }))
+    await vi.waitFor(() => { expect(onRemoveDelivery).toHaveBeenCalledWith('d1') })
+  })
+
+  it('renders the follow-up center queue with the rung badge, kind, days, and reminder count', () => {
+    render(<ClientsPage {...props()} />)
+    expect(screen.getByText(zh['clients.followUpCenter.title'])).toBeTruthy()
+    const center = screen.getByText(zh['clients.followUpCenter.title']).closest('section')!
+    const queueRow = within(center).getByText(zh['clients.followUp.chase']).closest('li')!
+    expect(within(queueRow).getByText(zh['clients.followUpCenter.kind.delivery'])).toBeTruthy()
+    expect(within(queueRow).getByText(zh['clients.delivery.days'].replace('{n}', '7'))).toBeTruthy()
+    expect(within(queueRow).getByText(zh['clients.followUpCenter.reminders'].replace('{n}', '1'))).toBeTruthy()
+    const message = within(queueRow).getByLabelText(zh['clients.followUpCenter.message']) as HTMLTextAreaElement
+    expect(message.value).toBe('催办话术草稿')
+  })
+
+  it('logs a reminder with the edited message and channel from the queue row', async () => {
+    const onRecordFollowUp = vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true }))
+    render(<ClientsPage {...props({ onRecordFollowUp })} />)
+    const center = screen.getByText(zh['clients.followUpCenter.title']).closest('section')!
+    const queueRow = within(center).getByText(zh['clients.followUp.chase']).closest('li')!
+
+    fireEvent.change(within(queueRow).getByLabelText(zh['clients.followUpCenter.message']), { target: { value: '已电话提醒客户' } })
+    fireEvent.change(within(queueRow).getByLabelText(zh['clients.followUpCenter.channel']), { target: { value: 'whatsapp' } })
+    fireEvent.click(within(queueRow).getByRole('button', { name: zh['clients.followUpCenter.submit'] }))
+
+    await vi.waitFor(() => {
+      expect(onRecordFollowUp).toHaveBeenCalledWith({
+        targetKind: 'delivery', targetId: 'd1', channel: 'whatsapp', message: '已电话提醒客户',
+      })
+    })
+  })
+
+  it('notes an empty queue and surfaces a refused reminder from the row', async () => {
+    const onRecordFollowUp = vi.fn((): Promise<MutationOutcome> => Promise.resolve({
+      ok: false, code: 'workbench/follow-up-not-open', error: 'already closed',
+    }))
+    const { unmount } = render(<ClientsPage {...props({ clients: EMPTY_CLIENTS, onRecordFollowUp })} />)
+    expect(screen.getByText(zh['clients.followUpCenter.empty'])).toBeTruthy()
+    unmount()
+
+    render(<ClientsPage {...props({ onRecordFollowUp })} />)
+    const center = screen.getByText(zh['clients.followUpCenter.title']).closest('section')!
+    const queueRow = within(center).getByText(zh['clients.followUp.chase']).closest('li')!
+    fireEvent.click(within(queueRow).getByRole('button', { name: zh['clients.followUpCenter.submit'] }))
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole('alert').textContent)
+        .toBe(zh['clients.followUpCenter.failed'].replace('{message}', 'already closed'))
+    })
+  })
 })
 
 describe('WorkbenchShell', () => {
@@ -428,6 +829,7 @@ describe('WorkbenchShell', () => {
       load: vi.fn(() => Promise.resolve()),
       loadLedger: vi.fn(() => Promise.resolve()),
       loadMembers: vi.fn(() => Promise.resolve()),
+      loadClients: vi.fn(() => Promise.resolve()),
       close: vi.fn(),
       openSession: vi.fn(),
       startWithPreset: vi.fn(),
@@ -435,12 +837,25 @@ describe('WorkbenchShell', () => {
       grantCredits: vi.fn(() => Promise.resolve(null)),
       createInvite: vi.fn((): Promise<InviteOutcome> => Promise.resolve({ ok: true, code: 'x', expiresAt: 1 })),
       unbindMember: vi.fn((): Promise<string | null> => Promise.resolve(null)),
+      assignMember: vi.fn((): Promise<string | null> => Promise.resolve(null)),
+      deleteAccount: vi.fn((): Promise<string | null> => Promise.resolve(null)),
+      addClient: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
+      removeClient: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
+      addObligation: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
+      markObligation: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
+      removeObligation: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
+      addDelivery: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
+      markDelivery: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
+      removeDelivery: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
+      recordFollowUp: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
     }
     return {
       usePages: <S,>(select: (snapshot: WorkbenchPagesState) => S) => select({ open }),
       useWorkbench: <S,>(select: (snapshot: WorkbenchState) => S) => select(READY),
       useLedger: <S,>(select: (snapshot: LedgerState) => S) => select({ status: 'ready', error: null, entries: [] }),
-      useMembers: <S,>(select: (snapshot: MembersState) => S) => select({ status: 'ready', error: null, members: [] }),
+      useMembers: <S,>(select: (snapshot: MembersState) => S) =>
+        select({ status: 'ready', error: null, owner: '', members: [], accounts: [] }),
+      useClients: <S,>(select: (snapshot: ClientsState) => S) => select(EMPTY_CLIENTS),
       useTasks: () => [] as readonly TaskRow[],
       ...handlers,
       t,
@@ -460,6 +875,14 @@ describe('WorkbenchShell', () => {
     expect(screen.getByRole('heading', { name: zh['nav.report'] })).toBeTruthy()
     await vi.waitFor(() => { expect(loadLedger).toHaveBeenCalledTimes(1) })
     expect(load).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens the clients page, reads its data once, and renders the schedule', async () => {
+    const loadClients = vi.fn(() => Promise.resolve())
+    render(<WorkbenchShell {...props('clients', { loadClients })} />)
+    expect(screen.getByRole('heading', { name: zh['nav.clients'] })).toBeTruthy()
+    expect(screen.getByText(zh['clients.schedule.empty'])).toBeTruthy()
+    await vi.waitFor(() => { expect(loadClients).toHaveBeenCalledTimes(1) })
   })
 
   it('dismisses on the close control and on Escape', () => {

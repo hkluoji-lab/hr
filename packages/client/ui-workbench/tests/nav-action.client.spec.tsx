@@ -125,6 +125,20 @@ describe('WorkbenchNavAction', () => {
     expect(screen.getByRole('button', { name: zh['nav.members'] })).toBeTruthy()
   })
 
+  it('reveals the members row when the status load flips isOwner on the same instance', () => {
+    // Regression: the owner gate used to early-return before the expansion
+    // useStates, so flipping `my.isOwner` on a mounted row changed the hook
+    // count and crashed the sidebar.nav slot (React #310).
+    let owner = false
+    const useMy = () => (owner ? { name: null, roles: [], isOwner: true } : MY_VISITOR)
+    const view = render(<WorkbenchNavAction {...props({ target: 'members', useMy })} />)
+    expect(screen.queryByRole('button', { name: zh['nav.members'] })).toBeNull()
+
+    owner = true
+    view.rerender(<WorkbenchNavAction {...props({ target: 'members', useMy })} />)
+    expect(screen.getByRole('button', { name: zh['nav.members'] })).toBeTruthy()
+  })
+
   it('scopes the team role groups to the bound member\'s roles', () => {
     render(<WorkbenchNavAction {...props({
       target: 'team',
