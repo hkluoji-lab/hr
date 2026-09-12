@@ -183,6 +183,7 @@ flowchart TD
     pkg_client_ui_tool["client-ui-tool"]
     pkg_client_ui_trajectory["client-ui-trajectory"]
     pkg_client_ui_user_questions["client-ui-user-questions"]
+    pkg_client_ui_workbench["client-ui-workbench"]
     pkg_client_ui_workflow_run["client-ui-workflow-run"]
     pkg_client_ui_workspace["client-ui-workspace"]
     pkg_client_web["client-web"]
@@ -364,6 +365,9 @@ flowchart TD
   subgraph group_webhook["packages/webhook"]
     pkg_webhook["webhook"]
     pkg_webhook_github["webhook-github"]
+  end
+  subgraph group_workbench["packages/workbench"]
+    pkg_workbench["workbench"]
   end
   subgraph group_workflow["packages/workflow"]
     pkg_tool_ralph["tool-ralph"]
@@ -967,6 +971,12 @@ flowchart TD
   pkg_webhook --> pkg_session
   pkg_webhook --> pkg_session_title
   pkg_webhook --> pkg_workspace
+  pkg_workbench --> pkg_agent
+  pkg_workbench --> pkg_agent_presets
+  pkg_workbench --> pkg_session
+  pkg_workbench --> pkg_session_projection
+  pkg_workbench --> pkg_storage_domain
+  pkg_workbench --> pkg_typert_protocol
   pkg_subagent --> pkg_agent
   pkg_subagent --> pkg_agent_presets
   pkg_subagent --> pkg_attachment
@@ -1242,6 +1252,7 @@ flowchart TD
 | [`client-ui-tool`](../packages/client/ui-tool) | `client` | — |
 | [`client-ui-trajectory`](../packages/client/ui-trajectory) | `client` | — |
 | [`client-ui-user-questions`](../packages/client/ui-user-questions) | `client` | — |
+| [`client-ui-workbench`](../packages/client/ui-workbench) | `client` | — |
 | [`client-ui-workflow-run`](../packages/client/ui-workflow-run) | `client` | — |
 | [`client-ui-workspace`](../packages/client/ui-workspace) | `client` | — |
 | [`client-web`](../packages/client/web) | `client` | — |
@@ -1411,6 +1422,7 @@ flowchart TD
 | [`tool-pwsh`](../packages/shell/tool-pwsh) | `shell` | [`agent`](../packages/core/agent), [`jobs`](../packages/jobs/jobs), [`llm`](../packages/llm/llm), [`sandbox`](../packages/sandbox/sandbox), [`sandbox-policy`](../packages/sandbox/sandbox-policy), [`shell`](../packages/shell/shell), [`shell-env`](../packages/shell/shell-env), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools), [`user-approval`](../packages/interaction/user-approval) |
 | [`agent-loop-testkit`](../packages/test-support/agent-loop-testkit) | `test-support` | [`agent`](../packages/core/agent), [`agent-loop`](../packages/core/agent-loop), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`session-projection`](../packages/session/session-projection), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools) |
 | [`webhook`](../packages/webhook/webhook) | `webhook` | [`agent`](../packages/core/agent), [`agent-default-model`](../packages/core/agent-default-model), [`agent-presets`](../packages/preset/agent-presets), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`permission-presets`](../packages/interaction/permission-presets), [`session`](../packages/core/session), [`session-title`](../packages/session/session-title), [`workspace`](../packages/workspace/workspace) |
+| [`workbench`](../packages/workbench/workbench) | `workbench` | [`agent`](../packages/core/agent), [`agent-presets`](../packages/preset/agent-presets), [`session`](../packages/core/session), [`session-projection`](../packages/session/session-projection), [`storage-domain`](../packages/storage/storage-domain), [`typert-protocol`](../packages/typert/protocol) |
 | [`subagent`](../packages/subagent/subagent) | `subagent` | [`agent`](../packages/core/agent), [`agent-presets`](../packages/preset/agent-presets), [`attachment`](../packages/attachment/attachment), [`invariants`](../packages/runtime-diagnostics/invariants), [`jobs`](../packages/jobs/jobs), [`llm`](../packages/llm/llm), [`sandbox`](../packages/sandbox/sandbox), [`sandbox-policy`](../packages/sandbox/sandbox-policy), [`scope`](../packages/core/scope), [`session`](../packages/core/session), [`session-persistence`](../packages/session/session-persistence), [`session-projection`](../packages/session/session-projection), [`session-projection-cache`](../packages/session/session-projection-cache), [`session-query`](../packages/session-query/session-query), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools), [`typert-protocol`](../packages/typert/protocol), [`user-approval`](../packages/interaction/user-approval), [`util-time`](../packages/util/time) |
 | [`session-query-sqlite`](../packages/session-query/session-query-sqlite) | `session-query` | [`session`](../packages/core/session), [`session-persistence`](../packages/session/session-persistence), [`session-query`](../packages/session-query/session-query) |
 | [`tool-session-query`](../packages/session-query/tool-session-query) | `session-query` | [`agent`](../packages/core/agent), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`session-projection`](../packages/session/session-projection), [`session-query`](../packages/session-query/session-query), [`system-prompt`](../packages/core/system-prompt), [`timeout`](../packages/util/timeout), [`tools`](../packages/core/tools) |

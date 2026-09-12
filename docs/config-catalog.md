@@ -381,7 +381,7 @@ export interface ConnectionRecoveryConfig {
 }
 ```
 
-Source: [`packages/client/connection/src/index.ts:72`](../packages/client/connection/src/index.ts)
+Source: [`packages/client/connection/src/index.ts:73`](../packages/client/connection/src/index.ts)
 
 <a id="deepseek-aidsh-client-hmr"></a>
 
@@ -1690,7 +1690,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/llm/plugin-package-inventory-deepseek/src/index.ts:31`](../packages/llm/plugin-package-inventory-deepseek/src/index.ts)
+Source: [`packages/llm/plugin-package-inventory-deepseek/src/index.ts:38`](../packages/llm/plugin-package-inventory-deepseek/src/index.ts)
 
 <a id="deepseek-aidsh-pwsh-local"></a>
 
@@ -3292,6 +3292,34 @@ export interface Config {
 
 Source: [`packages/web/web-fetch-http/src/index.ts:32`](../packages/web/web-fetch-http/src/index.ts)
 
+<a id="deepseek-aidsh-web-login"></a>
+
+## `@deepseek-ai/dsh-web-login`
+
+Requires: `webServer` · `connection` · `storageDomain`
+
+```ts config-catalog
+/** Web-login plugin configuration. */
+export interface Config {
+  /** Minimum gap between two sends for one phone, in seconds. */
+  readonly codeCooldownSeconds: number
+  /** How long one code stays verifiable, in seconds. */
+  readonly codeValiditySeconds: number
+  /** Wrong verifications allowed before one challenge is destroyed. */
+  readonly maxVerificationAttempts: number
+  /**
+   * Whether `POST /auth/register` demands an SMS code beside the password.
+   * False creates the account from a phone and a password alone, so a
+   * deployment with no SMS provider can still register accounts.
+   */
+  readonly requireRegistrationCode: boolean
+  /** How long one member invite stays redeemable, in seconds. */
+  readonly inviteValiditySeconds: number
+}
+```
+
+Source: [`packages/host/web-login/src/index.ts:83`](../packages/host/web-login/src/index.ts)
+
 <a id="deepseek-aidsh-web-search-deepseek"></a>
 
 ## `@deepseek-ai/dsh-web-search-deepseek`
@@ -3390,6 +3418,24 @@ export interface Config {
 
 Source: [`packages/webhook/webhook-github/src/index.ts:17`](../packages/webhook/webhook-github/src/index.ts)
 
+<a id="deepseek-aidsh-workbench"></a>
+
+## `@deepseek-ai/dsh-workbench`
+
+Requires: `storageDomain` · `agentPresets` · `sessions` · `sessionProjections`
+
+```ts config-catalog
+/** The user-writable plugin config. */
+export interface Config {
+  /** Balance a fresh medium serves before the first grant. */
+  startingBalance: number
+  /** Largest amount one grant may carry. */
+  maxGrant: number
+}
+```
+
+Source: [`packages/workbench/workbench/src/index.ts:141`](../packages/workbench/workbench/src/index.ts)
+
 <a id="deepseek-aidsh-workflow-worker-thread"></a>
 
 ## `@deepseek-ai/dsh-workflow-worker-thread`
@@ -3472,6 +3518,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-client-ui-tool` ([`packages/client/ui-tool/src/index.ts`](../packages/client/ui-tool/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-trajectory` ([`packages/client/ui-trajectory/src/index.ts`](../packages/client/ui-trajectory/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-user-questions` ([`packages/client/ui-user-questions/src/index.ts`](../packages/client/ui-user-questions/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-workbench` ([`packages/client/ui-workbench/src/index.ts`](../packages/client/ui-workbench/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-workflow-run` ([`packages/client/ui-workflow-run/src/index.ts`](../packages/client/ui-workflow-run/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-workspace` ([`packages/client/ui-workspace/src/index.ts`](../packages/client/ui-workspace/src/index.ts))
 - `@deepseek-ai/dsh-command-compact` — requires `commands` · `compaction` ([`packages/compaction/command-compact/src/index.ts`](../packages/compaction/command-compact/src/index.ts))

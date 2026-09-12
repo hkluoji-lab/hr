@@ -1298,6 +1298,30 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'loginSession',
+    summary: 'Most-recent-login holder provided as `ctx.loginSession`.',
+    description: 'Most-recent-login holder provided as `ctx.loginSession`.',
+    methods: [
+      {
+        signature: 'record(identity: LoginIdentity): void',
+        description: 'Record one successful login, replacing any previous identity.',
+        parameters: [{ name: 'identity', description: 'the phone and masked display name of the login.' }],
+      },
+      {
+        signature: 'displayName(): string | undefined',
+        description: 'The display name of the most recent login this process life.',
+        parameters: [],
+        returns: 'the display name, or undefined before the first login.',
+      },
+      {
+        signature: 'phone(): string | undefined',
+        description: 'The phone of the most recent login this process life.',
+        parameters: [],
+        returns: 'the phone, or undefined before the first login.',
+      },
+    ],
+  },
+  {
     key: 'lsp',
     summary: 'The LSP capability seam (`ctx.lsp`).',
     description: 'The LSP capability seam (`ctx.lsp`). Owns provider registration/selection and normalized query execution; exposes exactly the four operations and no protocol escape hatch.',
@@ -2836,6 +2860,120 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'workbench',
+    summary: 'The workbench Remote service: credits storage plus roster aggregation.',
+    description: 'The workbench Remote service: credits storage plus roster aggregation.',
+    methods: [
+      {
+        signature: '@Remote(\'snapshot\') async remoteSnapshot(): Promise<WorkbenchSnapshot>',
+        description: 'The Remote read: current credits balance beside the aggregated team.',
+        parameters: [],
+        returns: 'one snapshot over both halves.',
+      },
+      {
+        signature: '@Remote(\'addCredits\') async addCredits(amount: number, reason: string): Promise<WorkbenchCreditGrant>',
+        description: 'Grant points: append one ledger entry, then replace the balance global. Both writes queue on the domain\'s single chain, so concurrent grants never interleave or lose an increment.',
+        parameters: [{ name: 'amount', description: 'positive integer points, at most `config.maxGrant`.' }, { name: 'reason', description: 'non-empty trimmed reason, at most {@link MAX_REASON_LENGTH} characters.' }],
+        returns: 'the new balance beside the appended entry.',
+        throws: ['RemoteError `gateway/bad-request` when the amount or reason is invalid.'],
+      },
+      {
+        signature: '@Remote(\'ledger\') remoteLedger(): Promise<WorkbenchLedger>',
+        description: 'The Remote ledger read: the most recent grants, newest first. The page is bounded because the ledger is append-only — a long-lived deployment accumulates one row per grant.',
+        parameters: [],
+        returns: 'the recent entries, at most {@link LEDGER_READ_LIMIT}.',
+      },
+      {
+        signature: '@Remote(\'clients\') remoteClients(): Promise<WorkbenchClientList>',
+        description: 'The Remote client-master read: every stored client row with its open obligation and open-delivery counts, creation order preserved.',
+        parameters: [],
+        returns: 'the full client list.',
+      },
+      {
+        signature: '@Remote(\'addClient\') async addClient(payload: WorkbenchClientCreate): Promise<WorkbenchClientCreated>',
+        description: 'Create one client master row. The id is `C-<year>-<serial>` with the serial advancing past every id already stored for that year; the write queues on the domain\'s single chain.',
+        parameters: [{ name: 'payload', description: 'the creation request; required fields validated at the wire boundary, optional fields stored when non-empty.' }],
+        returns: 'the stored row as the client reads it.',
+        throws: ['RemoteError `gateway/bad-request` when a field is invalid.'],
+      },
+      {
+        signature: '@Remote(\'removeClient\') async removeClient(id: string): Promise<void>',
+        description: 'Remove one client master row and every obligation and delivery recorded for it.',
+        parameters: [{ name: 'id', description: 'the client id to remove.' }],
+        throws: ['RemoteError `workbench/client-not-found` when no row carries that id.'],
+      },
+      {
+        signature: '@Remote(\'obligations\') remoteObligations(): Promise<WorkbenchObligationList>',
+        description: 'The Remote obligation-ledger read: every stored row joined with its client\'s name, open rows first, each group soonest due first, with the reminder tier derived from today\'s UTC date.',
+        parameters: [],
+        returns: 'the full obligation list.',
+      },
+      {
+        signature: '@Remote(\'addObligation\') async addObligation(payload: WorkbenchObligationCreate): Promise<{ obligation: WorkbenchObligation }>',
+        description: 'Record one filing obligation against a stored client.',
+        parameters: [{ name: 'payload', description: 'the recording request; the client must exist.' }],
+        returns: 'the stored row as the client reads it.',
+        throws: ['RemoteError `gateway/bad-request` when a field is invalid, or `workbench/client-not-found` when the client id is unknown.'],
+      },
+      {
+        signature: '@Remote(\'markObligation\') async markObligation(id: string, status: WorkbenchObligationStatus): Promise<void>',
+        description: 'Move one obligation between `open` and `submitted` — the SOP\'s client-submitted closing step. The wire codec validates `status` against the lifecycle union before the method runs.',
+        parameters: [{ name: 'id', description: 'the obligation id.' }, { name: 'status', description: 'the lifecycle state to set.' }],
+        throws: ['RemoteError `workbench/obligation-not-found` when the id is unknown.'],
+      },
+      {
+        signature: '@Remote(\'removeObligation\') async removeObligation(id: string): Promise<void>',
+        description: 'Remove one obligation row.',
+        parameters: [{ name: 'id', description: 'the obligation id.' }],
+        throws: ['RemoteError `workbench/obligation-not-found` when the id is unknown.'],
+      },
+      {
+        signature: '@Remote(\'deliveries\') remoteDeliveries(): Promise<WorkbenchDeliveryList>',
+        description: 'The Remote delivery-ledger read (S-DELIV-01): every stored row joined with its client\'s name, open rows first (longest waiting first) so the page reads as the follow-up queue, each row\'s follow-up tier derived from today\'s UTC date.',
+        parameters: [],
+        returns: 'the full delivery list.',
+      },
+      {
+        signature: '@Remote(\'addDelivery\') async addDelivery(payload: WorkbenchDeliveryCreate): Promise<{ delivery: WorkbenchDelivery }>',
+        description: 'Record one signature delivery against a stored client; the row opens in `sent`, sent now, so the follow-up ladder starts measuring immediately.',
+        parameters: [{ name: 'payload', description: 'the recording request; the client must exist.' }],
+        returns: 'the stored row as the client reads it.',
+        throws: ['RemoteError `gateway/bad-request` when a field is invalid, or `workbench/client-not-found` when the client id is unknown.'],
+      },
+      {
+        signature: '@Remote(\'markDelivery\') async markDelivery(id: string, status: WorkbenchDeliveryStatus): Promise<void>',
+        description: 'Move one delivery along its lifecycle (`sent` → `viewed` → `signed` → `returned`) — the SOP\'s view, sign, and returned-archive steps. The wire codec validates `status` against the lifecycle union before the method runs.',
+        parameters: [{ name: 'id', description: 'the delivery id.' }, { name: 'status', description: 'the lifecycle state to set.' }],
+        throws: ['RemoteError `workbench/delivery-not-found` when the id is unknown.'],
+      },
+      {
+        signature: '@Remote(\'removeDelivery\') async removeDelivery(id: string): Promise<void>',
+        description: 'Remove one delivery row.',
+        parameters: [{ name: 'id', description: 'the delivery id.' }],
+        throws: ['RemoteError `workbench/delivery-not-found` when the id is unknown.'],
+      },
+      {
+        signature: '@Remote(\'followUps\') remoteFollowUps(): Promise<WorkbenchFollowUpList>',
+        description: 'The Remote follow-up-center read (S-FOLLOW-01): every open delivery that has entered a chase rung (T+3/T+7/T+14) and every open obligation sitting in a reminder rung (d30/d15/d7/d1/overdue), folded into one queue with the rung\'s suggested channel, the host-drafted message, and how many reminders have already been logged. Rows sort most urgent rung first, so the page reads as today\'s chase list.',
+        parameters: [],
+        returns: 'the actionable rows, most urgent first.',
+      },
+      {
+        signature: '@Remote(\'recordFollowUp\') async recordFollowUp(payload: WorkbenchFollowUpCreate): Promise<WorkbenchReminderLogged>',
+        description: 'Log one follow-up reminder against an open target (S-FOLLOW-01): the ladder rung is re-derived from today\'s date so the record stays truthful, the channel defaults to the rung\'s suggestion, and the message defaults to the host\'s draft — both accept the secretary\'s override. The write queues on the domain\'s single chain.',
+        parameters: [{ name: 'payload', description: 'the logging request; the target must exist and be open.' }],
+        returns: 'the stored reminder row.',
+        throws: ['RemoteError `gateway/bad-request` when a field is invalid, `workbench/delivery-not-found` or `workbench/obligation-not-found` when the target id is unknown, or `workbench/follow-up-not-open` when the target has already closed.'],
+      },
+      {
+        signature: '@Remote(\'complianceSchedule\') remoteComplianceSchedule(): Promise<WorkbenchSchedule>',
+        description: 'The Remote schedule read: the current year\'s statutory-filing outlook. Stored obligations due in the year are authoritative; every client whose incorporation anniversary falls in the year also gets a projected NAR1 row due NAR1_FILING_WINDOW_DAYS days after the anniversary, unless an NAR1 obligation for the year is already recorded. Rows sort soonest due first, so the page reads as the year\'s filing calendar.',
+        parameters: [],
+        returns: 'the schedule year beside its rows.',
+      },
+    ],
+  },
+  {
     key: 'workflowEngine',
     summary: 'Workflow Service Definition contract.',
     description: 'Workflow Service Definition contract. Invalid requests throw before publication; a live run is holder-owned, its result never rejects, cancellation and disposal are bounded, and disposal waits for child cleanup within that bound. Lifecycle listener failures are contained, and `workflow/end` fires exactly once as the result settles.',
@@ -3608,10 +3746,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type AgentStatus = \'idle\' | \'running\';',
   },
   {
-    name: 'ApiKeyRecord',
-    declaration: 'export interface ApiKeyRecord {\n    readonly kind: \'api-key\';\n    readonly key?: string;\n    readonly env?: Readonly<Record<string, string>>;\n}',
-  },
-  {
     name: 'ApiSessionAgentError',
     declaration: 'export type ApiSessionAgentError = RemoteError<\'session/not-found\' | \'session/agent-busy\' | \'gateway/internal\'>;',
   },
@@ -4012,10 +4146,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type CredentialKey = Branded<\'CredentialKey\'>;',
   },
   {
-    name: 'CredentialRecord',
-    declaration: 'export type CredentialRecord = ApiKeyRecord | GrantRecord;',
-  },
-  {
     name: 'CredentialRecordEntry',
     declaration: 'export interface CredentialRecordEntry {\n    key: CredentialKey;\n    kind: CredentialRecord[\'kind\'];\n}',
   },
@@ -4304,10 +4434,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface GoalView extends GoalSnapshot {\n    readonly roundsStarted: number;\n    readonly createdAt: number;\n    readonly updatedAt: number;\n    readonly activation: GoalActivation;\n}',
   },
   {
-    name: 'GrantRecord',
-    declaration: 'export interface GrantRecord {\n    readonly kind: \'grant\';\n    readonly payload: unknown;\n}',
-  },
-  {
     name: 'ImageAttachmentLimits',
     declaration: 'export interface ImageAttachmentLimits {\n    maxImageBytes: number;\n    maxImagesPerMessage: number;\n    maxMessageImageBytes: number;\n    maxImagePixels: number;\n    maxImageDimension: number;\n    mediaTypes: readonly ImageMediaType[];\n}',
   },
@@ -4526,6 +4652,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'LlmRuntime',
     declaration: 'export class LlmRuntime extends TypertRemoteService {\n    constructor(ctx: Context);\n    registerAdapter(providers: string[], adapter: LlmAdapter): AdapterRegistrationHandle;\n    @Remote\n    listProviders(): LlmProviderInfo[];\n    registerConfigurableProviders(entries: readonly LlmConfigurableProvider[]): DirectoryRegistrationHandle;\n    @Remote\n    listConfigurableProviders(): LlmConfigurableProvider[];\n    registerModelDiscovery(settingsNs: string, discover: (request: LlmModelDiscoveryRequest, signal?: AbortSignal) => Promise<readonly LlmDiscoveredModel[]>): () => void;\n    async discoverModels(settingsNs: string, request: LlmModelDiscoveryRequest, signal?: AbortSignal): Promise<LlmDiscoveredModel[]>;\n    @Remote(\'discoverModels\')\n    async remoteDiscoverModels(settingsNs: string, request: LlmModelDiscoveryRequest, signal: AbortSignal): Promise<LlmDiscoveredModel[]>;\n    providerRetryPolicy(provider: string): ResolvedRetryPolicy;\n    imageRequestPricing(provider: string, model: string): LlmImageRequestPricing | undefined;\n    fileRequestText(ref: FileAttachmentRef): string;\n    async listModels(provider: string): Promise<LlmModelInfo[]>;\n    async resolveModelInfo(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>;\n    async resolveCallConfig(config: LlmCallConfig, signal?: AbortSignal): Promise<LlmCallConfig>;\n    async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<PreparedLlmCall>;\n    stream(options: GenerateOptions) /* …truncated — full shape in source */',
+  },
+  {
+    name: 'LoginIdentity',
+    declaration: 'export interface LoginIdentity {\n    readonly phone: string;\n    readonly displayName: string;\n}',
   },
   {
     name: 'LspHover',
@@ -6306,6 +6436,146 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WebUpgradeRoute',
     declaration: 'export interface WebUpgradeRoute {\n    path: string;\n    handler: (req: IncomingMessage, socket: Duplex, head: Buffer) => void | Promise<void>;\n}',
+  },
+  {
+    name: 'WorkbenchClient',
+    declaration: 'export interface WorkbenchClient {\n    readonly id: string;\n    readonly nameCn: string;\n    readonly nameEn?: string;\n    readonly brNo?: string;\n    readonly crNo?: string;\n    readonly incorporationDate: string;\n    readonly registeredAddress?: string;\n    readonly contactEmail?: string;\n    readonly contactWechat?: string;\n    readonly contactWhatsapp?: string;\n    readonly complianceStatus: WorkbenchComplianceStatus;\n    readonly createdAt: number;\n    readonly openObligations: number;\n    readonly openDeliveries: number;\n}',
+  },
+  {
+    name: 'WorkbenchClientCreate',
+    declaration: 'export interface WorkbenchClientCreate {\n    readonly nameCn: string;\n    readonly nameEn?: string;\n    readonly brNo?: string;\n    readonly crNo?: string;\n    readonly incorporationDate: string;\n    readonly registeredAddress?: string;\n    readonly contactEmail?: string;\n    readonly contactWechat?: string;\n    readonly contactWhatsapp?: string;\n    readonly complianceStatus?: WorkbenchComplianceStatus;\n}',
+  },
+  {
+    name: 'WorkbenchClientCreated',
+    declaration: 'export interface WorkbenchClientCreated {\n    readonly client: WorkbenchClient;\n}',
+  },
+  {
+    name: 'WorkbenchClientList',
+    declaration: 'export interface WorkbenchClientList {\n    readonly clients: readonly WorkbenchClient[];\n}',
+  },
+  {
+    name: 'WorkbenchComplianceStatus',
+    declaration: 'export type WorkbenchComplianceStatus = \'green\' | \'yellow\' | \'red\';',
+  },
+  {
+    name: 'WorkbenchCreditEntry',
+    declaration: 'export interface WorkbenchCreditEntry {\n    readonly id: string;\n    readonly amount: number;\n    readonly reason: string;\n    readonly at: number;\n}',
+  },
+  {
+    name: 'WorkbenchCreditGrant',
+    declaration: 'export interface WorkbenchCreditGrant {\n    readonly balance: number;\n    readonly entry: WorkbenchCreditEntry;\n}',
+  },
+  {
+    name: 'WorkbenchCredits',
+    declaration: 'export interface WorkbenchCredits {\n    readonly balance: number;\n}',
+  },
+  {
+    name: 'WorkbenchDelivery',
+    declaration: 'export interface WorkbenchDelivery {\n    readonly id: string;\n    readonly clientId: string;\n    readonly clientNameCn: string;\n    readonly title: string;\n    readonly channel: WorkbenchDeliveryChannel;\n    readonly status: WorkbenchDeliveryStatus;\n    readonly createdAt: number;\n    readonly daysSinceSent: number;\n    readonly followUpTier: WorkbenchFollowUpTier;\n}',
+  },
+  {
+    name: 'WorkbenchDeliveryChannel',
+    declaration: 'export type WorkbenchDeliveryChannel = \'email\' | \'wechat\' | \'whatsapp\';',
+  },
+  {
+    name: 'WorkbenchDeliveryCreate',
+    declaration: 'export interface WorkbenchDeliveryCreate {\n    readonly clientId: string;\n    readonly title: string;\n    readonly channel?: WorkbenchDeliveryChannel;\n}',
+  },
+  {
+    name: 'WorkbenchDeliveryList',
+    declaration: 'export interface WorkbenchDeliveryList {\n    readonly deliveries: readonly WorkbenchDelivery[];\n}',
+  },
+  {
+    name: 'WorkbenchDeliveryStatus',
+    declaration: 'export type WorkbenchDeliveryStatus = \'sent\' | \'viewed\' | \'signed\' | \'returned\';',
+  },
+  {
+    name: 'WorkbenchDueTier',
+    declaration: 'export type WorkbenchDueTier = \'ok\' | \'d30\' | \'d15\' | \'d7\' | \'d1\' | \'overdue\';',
+  },
+  {
+    name: 'WorkbenchFollowUp',
+    declaration: 'export interface WorkbenchFollowUp {\n    readonly id: string;\n    readonly targetKind: WorkbenchFollowUpTargetKind;\n    readonly targetId: string;\n    readonly clientId: string;\n    readonly clientNameCn: string;\n    readonly title: string;\n    readonly tier: WorkbenchReminderTier;\n    readonly suggestedChannel: WorkbenchDeliveryChannel;\n    readonly dueDate?: string;\n    readonly days: number;\n    readonly message: string;\n    readonly reminderCount: number;\n    readonly lastReminderAt?: number;\n}',
+  },
+  {
+    name: 'WorkbenchFollowUpCreate',
+    declaration: 'export interface WorkbenchFollowUpCreate {\n    readonly targetKind: WorkbenchFollowUpTargetKind;\n    readonly targetId: string;\n    readonly channel?: WorkbenchDeliveryChannel;\n    readonly message?: string;\n}',
+  },
+  {
+    name: 'WorkbenchFollowUpList',
+    declaration: 'export interface WorkbenchFollowUpList {\n    readonly followUps: readonly WorkbenchFollowUp[];\n}',
+  },
+  {
+    name: 'WorkbenchFollowUpTargetKind',
+    declaration: 'export type WorkbenchFollowUpTargetKind = \'delivery\' | \'obligation\';',
+  },
+  {
+    name: 'WorkbenchFollowUpTier',
+    declaration: 'export type WorkbenchFollowUpTier = \'fresh\' | \'nudge\' | \'chase\' | \'escalate\' | \'done\';',
+  },
+  {
+    name: 'WorkbenchLedger',
+    declaration: 'export interface WorkbenchLedger {\n    readonly entries: readonly WorkbenchCreditEntry[];\n}',
+  },
+  {
+    name: 'WorkbenchMember',
+    declaration: 'export interface WorkbenchMember {\n    readonly id: string;\n    readonly name?: string;\n    readonly description?: string;\n    readonly status: WorkbenchMemberStatus;\n}',
+  },
+  {
+    name: 'WorkbenchMemberStatus',
+    declaration: 'export type WorkbenchMemberStatus = \'online\' | \'busy\' | \'offline\';',
+  },
+  {
+    name: 'WorkbenchObligation',
+    declaration: 'export interface WorkbenchObligation {\n    readonly id: string;\n    readonly clientId: string;\n    readonly clientNameCn: string;\n    readonly kind: WorkbenchObligationKind;\n    readonly periodLabel: string;\n    readonly dueDate: string;\n    readonly status: WorkbenchObligationStatus;\n    readonly createdAt: number;\n    readonly daysUntilDue: number;\n    readonly dueTier: WorkbenchDueTier;\n}',
+  },
+  {
+    name: 'WorkbenchObligationCreate',
+    declaration: 'export interface WorkbenchObligationCreate {\n    readonly clientId: string;\n    readonly kind: WorkbenchObligationKind;\n    readonly periodLabel: string;\n    readonly dueDate: string;\n}',
+  },
+  {
+    name: 'WorkbenchObligationKind',
+    declaration: 'export type WorkbenchObligationKind = \'NAR1\' | \'AB56\' | \'PTR\' | \'ITR\';',
+  },
+  {
+    name: 'WorkbenchObligationList',
+    declaration: 'export interface WorkbenchObligationList {\n    readonly obligations: readonly WorkbenchObligation[];\n}',
+  },
+  {
+    name: 'WorkbenchObligationStatus',
+    declaration: 'export type WorkbenchObligationStatus = \'open\' | \'submitted\';',
+  },
+  {
+    name: 'WorkbenchReminder',
+    declaration: 'export interface WorkbenchReminder {\n    readonly id: string;\n    readonly targetKind: WorkbenchFollowUpTargetKind;\n    readonly targetId: string;\n    readonly tier: WorkbenchReminderTier;\n    readonly channel: WorkbenchDeliveryChannel;\n    readonly message: string;\n    readonly createdAt: number;\n}',
+  },
+  {
+    name: 'WorkbenchReminderLogged',
+    declaration: 'export interface WorkbenchReminderLogged {\n    readonly reminder: WorkbenchReminder;\n}',
+  },
+  {
+    name: 'WorkbenchReminderTier',
+    declaration: 'export type WorkbenchReminderTier = \'nudge\' | \'chase\' | \'escalate\' | \'d30\' | \'d15\' | \'d7\' | \'d1\' | \'overdue\';',
+  },
+  {
+    name: 'WorkbenchSchedule',
+    declaration: 'export interface WorkbenchSchedule {\n    readonly year: string;\n    readonly rows: readonly WorkbenchScheduleRow[];\n}',
+  },
+  {
+    name: 'WorkbenchScheduleRow',
+    declaration: 'export interface WorkbenchScheduleRow {\n    readonly clientId: string;\n    readonly clientNameCn: string;\n    readonly kind: WorkbenchObligationKind;\n    readonly periodLabel: string;\n    readonly dueDate: string;\n    readonly status: WorkbenchObligationStatus;\n    readonly source: \'ledger\' | \'derived\';\n    readonly dueTier: WorkbenchDueTier;\n}',
+  },
+  {
+    name: 'WorkbenchSnapshot',
+    declaration: 'export interface WorkbenchSnapshot {\n    readonly credits: WorkbenchCredits;\n    readonly team: WorkbenchTeam;\n    readonly user?: WorkbenchUser;\n}',
+  },
+  {
+    name: 'WorkbenchTeam',
+    declaration: 'export interface WorkbenchTeam {\n    readonly online: number;\n    readonly busy: number;\n    readonly offline: number;\n    readonly members: readonly WorkbenchMember[];\n}',
+  },
+  {
+    name: 'WorkbenchUser',
+    declaration: 'export interface WorkbenchUser {\n    readonly name: string;\n}',
   },
   {
     name: 'WorkflowAgentEndInfo',

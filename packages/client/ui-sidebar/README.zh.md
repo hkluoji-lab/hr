@@ -1,5 +1,5 @@
 ---
-description: "dsh Web 客户端的侧边栏外壳插件：品牌行、New Session 操作、折叠控件、可感知滚动的区域席位与底部固定的 Settings 席位。"
+description: "dsh Web 客户端的侧边栏外壳插件：品牌行、New Session 操作、主导航席位、折叠控件、可感知滚动的区域席位与底部固定的 Settings 席位。"
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-dsh Web 客户端的侧边栏让用户识别当前构建、启动新会话、将导航折叠为 56px 轨道、浏览 Workspace 与 Session，以及打开 Settings。它会将 Settings 入口固定在底部，并在隐藏空闲滚动条时避免浏览器行发生位移。New Session 优先使用显式选择的 Workspace，其次使用当前 Session 所属的 Workspace，再其次使用最近活跃的 Workspace；如果都不存在，则打开空白的 New Session 页面。部署可以替换品牌标记或名称，同时保留导航控件和轨道几何。
+dsh Web 客户端的侧边栏让用户识别当前构建、启动新会话、到达产品主导航、将导航折叠为 56px 轨道、浏览 Workspace 与 Session，以及打开 Settings。它会将 Settings 入口固定在底部，并在隐藏空闲滚动条时避免浏览器行发生位移。New Session 优先使用显式选择的 Workspace，其次使用当前 Session 所属的 Workspace，再其次使用最近活跃的 Workspace；如果都不存在，则打开空白的 New Session 页面。部署可以替换品牌标记或名称、填充导航席位，同时保留外壳的控件和轨道几何。
 
 ## 目录
 
@@ -25,11 +25,15 @@ dsh Web 客户端的侧边栏让用户识别当前构建、启动新会话、将
 <a id="use-this-package"></a>
 ## 使用本包
 
-侧边栏是导航外壳：用户看到品牌、启动新会话、折叠轨道并到达 Settings。功能插件填充它的席位——ui-workspace 填充 `sidebar.workspaces`，ui-settings 在 `sidebar.settings` 注册触发行与设置面板。
+侧边栏是导航外壳：用户看到品牌、启动新会话、到达产品主导航、折叠轨道并到达 Settings。功能插件填充它的席位——ui-workbench 在 `sidebar.nav` 填充主导航，ui-workspace 填充 `sidebar.workspaces`，ui-settings 在 `sidebar.settings` 注册触发行与设置面板。
 
 ### 品牌与 New Session
 
 展开的品牌行把 `sidebar.brand.mark` 与 `sidebar.brand.name` 渲染为两个独立的 single slot；收起轨道则渲染同一个 mark slot。没有占位者时，外壳使用鱼形标记和本地化的本地构建标签。完整构建会在标签下方显示代码徽标；该徽标使用 `DSH_CLIENT_VERSION`、可选的 7 位 `DSH_CLIENT_COMMIT_HASH` 与 `DSH_CLIENT_GIT_DIRTY=true` 组装成 `version[-commit][-dirty]`；缺少版本元数据时不显示徽标。New Session 优先使用作用域操作明确指定的 Workspace，否则使用当前 Session 所属 Workspace，再否则使用最近活跃 Workspace；一个 Workspace 都没有时则清空选择，进入空白 New Session 页面。
+
+### 主导航
+
+紧邻 New Session 之下，外壳渲染 `sidebar.nav` 列表并传入栏状态（`wide`）。该席位不持有导航状态：条目自行拥有目标与激活外观，因此部署可以在不改动外壳的前提下替换产品主导航。同一批条目在宽栏下渲染为带文字的行，在收起态渲染为轨道控件。
 
 ### 折叠行为
 
@@ -47,7 +51,7 @@ dsh Web 客户端的侧边栏让用户识别当前构建、启动新会话、将
 <details>
 <summary>实现细节——点击展开</summary>
 
-外壳是纯组合：`SidebarRootComponentProps` 组合布局 owner share、全局 `useSessions` 与 `useWorkspaces` 钩子、已声明的品牌、`sidebar.workspaces` 与 `sidebar.settings` 子 slot，以及注入的 `startSession` 与侧边栏切换回调。这里没有插件 store。
+外壳是纯组合：`SidebarRootComponentProps` 组合布局 owner share、全局 `useSessions` 与 `useWorkspaces` 钩子、已声明的品牌、`sidebar.nav`、`sidebar.workspaces` 与 `sidebar.settings` 子 slot，以及注入的 `startSession` 与侧边栏切换回调。这里没有插件 store。
 
 ### Slot 纪律
 

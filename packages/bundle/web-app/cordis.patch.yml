@@ -187,6 +187,14 @@
         # its literals, for example: ['app.internal', ...ctx.webRuntime.trustedHosts].
         trustedHosts: !!js ctx.webRuntime.trustedHosts
 
+    # Phone + SMS-code login over the same trust fence: the rendered /login
+    # page, the auth status / SMS send / verify / logout routes, and the
+    # `loginSession` identity service the workbench greeting prefers. Session
+    # cookies are minted through the connection row's service, so this row
+    # loads behind it; every unauthenticated Web request is redirected here.
+    - id: web-login
+      name: '@deepseek-ai/dsh-web-login'
+
     # Raw Blob and ReadableStream uploads run independently of Connection's
     # RPC and generation service.
     - id: file-upload
@@ -310,6 +318,11 @@
     # Background jobs: the session-header list over the jobsBySession mirror.
     - id: ui-jobs
       name: '@deepseek-ai/dsh-client-ui-jobs'
+
+    # Blank-session workbench dashboard: greeting, quick actions, and the
+    # agent-preset team roster over the conversation.hero.dashboard seat.
+    - id: ui-workbench
+      name: '@deepseek-ai/dsh-client-ui-workbench'
 
     # Goal surface: GoalBar in the input dock over the goal session projection.
     - id: ui-goal
@@ -481,3 +494,12 @@
       name: '@deepseek-ai/dsh-agent-presets'
       config:
         default: standard
+
+    # Workbench host capability: persisted credits (workbench storage domain
+    # over the base bundle's json backend) and the workbench/snapshot Remote
+    # aggregating the roster against live sessions for browser surfaces.
+    - id: workbench
+      name: '@deepseek-ai/dsh-workbench'
+      config:
+        startingBalance: 0
+        maxGrant: 100000

@@ -1,0 +1,772 @@
+/* Shared bodies of the four workbench pages: the task hall, the task
+   assistant, the AI team, and the month report. Every color carries a fallback
+   so the pages stay legible under a theme that redefines the surface tokens. */
+
+.empty {
+  margin: 24px 0 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--dsh-fg-muted, #8a8f99);
+}
+
+/* Task hall */
+
+.taskList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.taskRow {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--dsh-border, #eceef2);
+  border-radius: 12px;
+  background: var(--dsh-surface, #ffffff);
+  color: inherit;
+  font-family: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.taskRow:hover {
+  border-color: var(--dsh-accent, #b478e8);
+  box-shadow: 0 4px 14px rgba(180, 120, 232, 0.12);
+}
+
+.taskDot {
+  justify-self: center;
+}
+
+.taskTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.taskPreset,
+.taskTime {
+  font-size: 12px;
+  color: var(--dsh-fg-muted, #8a8f99);
+  white-space: nowrap;
+}
+
+.taskStatus {
+  padding: 2px 8px;
+  border-radius: 999px;
+  corner-shape: round;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  color: var(--dsh-fg-muted, #8a8f99);
+  background: var(--dsw-alias-interactive-bg-hover, rgba(139, 92, 246, 0.1));
+}
+
+/* AI team */
+
+/* The roster is exactly the four company roles: 2×2 on narrower frames, one
+   row of four on full-width frames, so no ragged 3+1 row ever appears. */
+.memberGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+@media (min-width: 1400px) {
+  .memberGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    max-width: 1240px;
+    margin-inline: auto;
+  }
+}
+
+.memberCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--dsh-border, #f0e6f8);
+  border-radius: 14px;
+  background: var(--dsh-surface, linear-gradient(160deg, #fdfaff 0%, #f8f1fe 100%));
+  color: inherit;
+  font-family: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.memberCard:hover:not(:disabled) {
+  border-color: var(--dsh-accent, #b478e8);
+  box-shadow: 0 6px 18px rgba(180, 120, 232, 0.16);
+  transform: translateY(-1px);
+}
+
+.memberCard:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.memberHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.memberIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--dsh-accent-soft, #f3eafd);
+  color: var(--dsh-accent, #9a5cd6);
+}
+
+.memberDot {
+  margin-top: 4px;
+}
+
+.memberName {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.memberDesc {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dsh-fg-muted, #8a8f99);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Task assistant */
+
+.assistant {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 720px;
+}
+
+.assistantIntro {
+  margin: 0;
+  font-size: 13px;
+  color: var(--dsh-fg-muted, #8a8f99);
+}
+
+.briefInput {
+  padding: 12px 14px;
+  border: 1px solid var(--dsh-border, #eceef2);
+  border-radius: 12px;
+  background: var(--dsh-surface, #ffffff);
+  color: var(--dsh-fg, #1f2329);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.briefInput:focus {
+  border-color: var(--dsh-accent, #b478e8);
+  outline: none;
+}
+
+.memberRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.memberChip {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 12px;
+  border: 1px solid var(--dsh-border, #eceef2);
+  border-radius: 999px;
+  corner-shape: round;
+  background: var(--dsh-surface, #ffffff);
+  color: inherit;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.memberChip:hover:not(:disabled) {
+  border-color: var(--dsh-accent, #b478e8);
+}
+
+.memberChip[aria-pressed='true'],
+.memberChip[aria-checked='true'] {
+  border-color: var(--dsh-accent, #b478e8);
+  color: var(--dsh-accent, #9a5cd6);
+  background: var(--dsh-accent-soft, #f3eafd);
+}
+
+.memberChip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.memberEmpty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dsh-fg-muted, #8a8f99);
+}
+
+.submitRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Month report */
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 18px;
+  border: 1px solid var(--dsh-border, #eceef2);
+  border-radius: 14px;
+  background: var(--dsh-surface, #ffffff);
+}
+
+.metricValue {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.metricLabel {
+  font-size: 12px;
+  color: var(--dsh-fg-muted, #8a8f99);
+}
+
+.section {
+  margin-bottom: 28px;
+}
+
+.sectionTitle {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ledgerList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ledgerRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--dsh-border, #eceef2);
+  border-radius: 12px;
+  background: var(--dsh-surface, #ffffff);
+  font-size: 14px;
+}
+
+.ledgerAmount {
+  font-weight: 700;
+  color: var(--dsh-accent, #9a5cd6);
+  white-space: nowrap;
+}
+
+.ledgerReason {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledgerTime {
+  font-size: 12px;
+  color: var(--dsh-fg-muted, #8a8f99);
+  white-space: nowrap;
+}
+
+.balance {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: var(--dsh-fg-muted, #8a8f99);
+}
+
+.balanceValue {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--dsh-fg, #1f2329);
+}
+
+.form {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--dsh-fg-muted, #8a8f99);
+}
+
+.formError {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dsw-alias-color-danger, #d94848);
+}
+
+/* Members management */
+
+.roleChecks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.roleCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  padding: 7px 14px;
+  border: 1px solid var(--dsh-border, #eceef2);
+  border-radius: 999px;
+  corner-shape: round;
+  background: var(--dsh-surface, #ffffff);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--dsh-fg, #1f2329);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.roleCheck:has(input:checked) {
+  border-color: var(--dsh-accent, #b478e8);
+  color: var(--dsh-accent, #9a5cd6);
+  background: var(--dsh-accent-soft, #f3eafd);
+}
+
+.roleCheck input {
+  accent-color: var(--dsh-accent, #9a5cd6);
+  margin: 0;
+}
+
+.phoneInput {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--dsh-border, #eceef2);
+  border-radius: 12px;
+  background: var(--dsh-surface, #ffffff);
+  color: var(--dsh-fg, #1f2329);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.phoneInput:focus {
+  border-color: var(--dsh-accent, #b478e8);
+  outline: none;
+}
+
+.inviteBox {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--dsh-accent, #b478e8);
+  border-radius: 14px;
+  background: var(--dsh-accent-soft, #f3eafd);
+}
+
+.inviteLabel {
+  font-size: 12px;
+  color: var(--dsh-fg-muted, #8a8f99);
+}
+
+.inviteCode {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--dsh-accent, #9a5cd6);
+  user-select: all;
+}
+
+.inviteMeta {
+  font-size: 12px;
+  color: var(--dsh-fg-muted, #8a8f99);
+}
+
+.memberListRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--dsh-border, #eceef2);
+  border-radius: 12px;
+  background: var(--dsh-surface, #ffffff);
+  font-size: 14px;
+}
+
+.memberListName {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberListRoles {
+  font-size: 12px;
+  color: var(--dsh-accent, #9a5cd6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.memberListMeta {
+  font-size: 12px;
+  color: var(--dsh-fg-muted, #8a8f99);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 900px) {
+  .memberListRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .memberListRoles,
+  .memberListMeta {
+    display: none;
+  }
+}
+
+/* Clients page: schedule, client master, filing ledger */
+
+.clientRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.6fr) auto minmax(0, 0.9fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--dsh-border, #eceef2);
+  border-radius: 12px;
+  background: var(--dsh-surface, #ffffff);
+  font-size: 14px;
+}
+
+.clientName {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clientAlt {
+  margin-left: 8px;
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--dsh-fg-muted, #8a8f99);
+}
+
+.clientMeta {
+  font-size: 12px;
+  color: var(--dsh-fg-muted, #8a8f99);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scheduleRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) auto minmax(0, 0.7fr) auto auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--dsh-border, #eceef2);
+  border-radius: 12px;
+  background: var(--dsh-surface, #ffffff);
+  font-size: 14px;
+}
+
+.obligationRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) auto minmax(0, 0.7fr) auto auto auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--dsh-border, #eceef2);
+  border-radius: 12px;
+  background: var(--dsh-surface, #ffffff);
+  font-size: 14px;
+}
+
+.kindBadge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  corner-shape: round;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--dsh-accent, #9a5cd6);
+  background: var(--dsh-accent-soft, #f3eafd);
+}
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  corner-shape: round;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+/* Compliance state of a client master row. */
+
+.green {
+  color: #1c7c3c;
+  background: rgba(46, 158, 91, 0.12);
+}
+
+.yellow {
+  color: #8a6116;
+  background: rgba(217, 168, 60, 0.16);
+}
+
+.red {
+  color: #b03030;
+  background: rgba(217, 72, 72, 0.12);
+}
+
+/* Reminder tiers, cooler the further out the due date sits; class names match
+   the wire tier ids the badges render from. */
+
+.ok {
+  color: var(--dsh-fg-muted, #8a8f99);
+  background: var(--dsw-alias-interactive-bg-hover, rgba(139, 92, 246, 0.1));
+}
+
+.d30 {
+  color: #1c5c7c;
+  background: rgba(60, 140, 190, 0.12);
+}
+
+.d15 {
+  color: #1c7c6c;
+  background: rgba(46, 158, 120, 0.12);
+}
+
+.d7 {
+  color: #8a6116;
+  background: rgba(217, 168, 60, 0.16);
+}
+
+.d1 {
+  color: #a04a10;
+  background: rgba(224, 120, 40, 0.14);
+}
+
+.overdue {
+  color: #b03030;
+  background: rgba(217, 72, 72, 0.12);
+}
+
+/* Obligation lifecycle. */
+
+.open {
+  color: #1c5c7c;
+  background: rgba(60, 140, 190, 0.12);
+}
+
+.submitted {
+  color: #1c7c3c;
+  background: rgba(46, 158, 91, 0.12);
+}
+
+/* Delivery ledger rows: the follow-up queue, longest-waiting open rows first. */
+
+.deliveryRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto auto auto auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--dsh-border, #eceef2);
+  border-radius: 12px;
+  background: var(--dsh-surface, #ffffff);
+  font-size: 14px;
+}
+
+.deliveryTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.channelBadge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  corner-shape: round;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  color: #1c5c7c;
+  background: rgba(60, 140, 190, 0.12);
+}
+
+/* Delivery lifecycle; class names match the wire status ids. */
+
+.sent {
+  color: #1c5c7c;
+  background: rgba(60, 140, 190, 0.12);
+}
+
+.viewed {
+  color: #1c7c6c;
+  background: rgba(46, 158, 120, 0.12);
+}
+
+.signed {
+  color: #1c7c3c;
+  background: rgba(46, 158, 91, 0.12);
+}
+
+.returned {
+  color: var(--dsh-fg-muted, #8a8f99);
+  background: var(--dsw-alias-interactive-bg-hover, rgba(139, 92, 246, 0.1));
+}
+
+/* Follow-up ladder; class names match the wire tier ids the badges render
+   from. */
+
+.fresh {
+  color: var(--dsh-fg-muted, #8a8f99);
+  background: var(--dsw-alias-interactive-bg-hover, rgba(139, 92, 246, 0.1));
+}
+
+.nudge {
+  color: #1c5c7c;
+  background: rgba(60, 140, 190, 0.12);
+}
+
+.chase {
+  color: #8a6116;
+  background: rgba(217, 168, 60, 0.16);
+}
+
+.escalate {
+  color: #b03030;
+  background: rgba(217, 72, 72, 0.12);
+}
+
+.done {
+  color: #1c7c3c;
+  background: rgba(46, 158, 91, 0.12);
+}
+
+/* Follow-up center rows: a facts head line over the editable chase message,
+   channel picker, and logging action. */
+
+.followUpList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.followUpRow {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--dsh-border, #eceef2);
+  border-radius: 12px;
+  background: var(--dsh-surface, #ffffff);
+  font-size: 14px;
+}
+
+.followUpHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.followUpBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.followUpAction {
+  padding-bottom: 1px;
+}
+
+/* Client and obligation creation forms share one responsive field grid. */
+
+.clientForm {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 16px 0 12px;
+}
+
+@media (max-width: 900px) {
+  .clientRow,
+  .scheduleRow,
+  .obligationRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .clientMeta,
+  .kindBadge {
+    display: none;
+  }
+
+  .followUpBody {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

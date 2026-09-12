@@ -112,6 +112,7 @@ root
 ├─ sidebar
 │  ├─ sidebar.brand.mark
 │  ├─ sidebar.brand.name
+│  ├─ sidebar.nav
 │  ├─ sidebar.footer.action
 │  ├─ sidebar.workspaces
 │  │  └─ sidebar.workspaces.directoryFlow

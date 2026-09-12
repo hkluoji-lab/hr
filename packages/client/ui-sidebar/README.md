@@ -1,5 +1,5 @@
 ---
-description: "Sidebar shell plugin for the dsh web client: brand row, New Session action, collapse control, scroll-aware region seat, and bottom-pinned Settings seat."
+description: "Sidebar shell plugin for the dsh web client: brand row, New Session action, primary navigation seat, collapse control, scroll-aware region seat, and bottom-pinned Settings seat."
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The dsh web client sidebar lets users recognize the active build, start a new session, collapse navigation to a 56px rail, browse Workspaces and Sessions, and open Settings. It preserves a bottom-pinned Settings entry and hides idle scrollbars without moving browser rows. New Session uses an explicitly selected Workspace, then the current Session's Workspace, then the most recently active Workspace; if none exists, it opens a blank New Session page. Deployments can replace the brand mark or name while retaining the navigation controls and rail geometry.
+The dsh web client sidebar lets users recognize the active build, start a new session, reach the product's primary navigation, collapse navigation to a 56px rail, browse Workspaces and Sessions, and open Settings. It preserves a bottom-pinned Settings entry and hides idle scrollbars without moving browser rows. New Session uses an explicitly selected Workspace, then the current Session's Workspace, then the most recently active Workspace; if none exists, it opens a blank New Session page. Deployments can replace the brand mark or name and fill the navigation seat while retaining the shell's controls and rail geometry.
 
 ## Table of Contents
 
@@ -25,11 +25,15 @@ The dsh web client sidebar lets users recognize the active build, start a new se
 <a id="use-this-package"></a>
 ## Use this package
 
-The sidebar is the navigation shell: users see the brand, start new sessions, collapse the rail, and reach Settings. Feature plugins fill its seats — ui-workspace fills `sidebar.workspaces`, ui-settings registers the trigger row and settings panel at `sidebar.settings`.
+The sidebar is the navigation shell: users see the brand, start new sessions, reach the product's primary navigation, collapse the rail, and reach Settings. Feature plugins fill its seats — ui-workbench fills the primary navigation at `sidebar.nav`, ui-workspace fills `sidebar.workspaces`, ui-settings registers the trigger row and settings panel at `sidebar.settings`.
 
 ### Brand and New Session
 
 The expanded brand row renders `sidebar.brand.mark` and `sidebar.brand.name` as independent single slots; the collapsed rail renders the same mark slot. Without occupants, the shell uses the fish mark and a localized local-build label. A complete build stacks a code badge below the label as `version[-commit][-dirty]`, using `DSH_CLIENT_VERSION`, the optional 7-character `DSH_CLIENT_COMMIT_HASH`, and `DSH_CLIENT_GIT_DIRTY=true`; missing version metadata omits the badge. New Session targets the explicit Workspace used by a scoped action, otherwise the current Session's Workspace, otherwise the most recently active Workspace; when none exists it clears into the blank New Session page.
+
+### Primary navigation
+
+Directly under New Session, the shell renders the `sidebar.nav` list with its column state (`wide`). The seat holds no navigation state: entries own their own targets and active appearance, so a deployment replaces the product's primary navigation without touching the shell. The same entries render as labelled rows when wide and as rail controls when collapsed.
 
 ### Collapse behavior
 
@@ -47,7 +51,7 @@ Scrollbars in the column are a pointer affordance: the shell rebinds the scrollb
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-The shell is pure composition: `SidebarRootComponentProps` composes the layout owner share, the global `useSessions` and `useWorkspaces` hooks, the declared brand, the `sidebar.workspaces` and `sidebar.settings` child slots, and injected `startSession` plus sidebar-toggle callbacks. There is no plugin store.
+The shell is pure composition: `SidebarRootComponentProps` composes the layout owner share, the global `useSessions` and `useWorkspaces` hooks, the declared brand, the `sidebar.nav`, `sidebar.workspaces`, and `sidebar.settings` child slots, and injected `startSession` plus sidebar-toggle callbacks. There is no plugin store.
 
 ### Slot discipline
 

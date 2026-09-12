@@ -630,6 +630,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Plain node:http carrier: named-route registry, index transform taps, and the static dist fallback; web-transport plugins register their own routes.',
   },
   {
+    key: 'loginSession',
+    pkg: 'web-login',
+    title: 'Most-recent-login identity holder',
+    mode: 'core',
+    consumers: ['workbench'],
+    note: 'In-memory identity of the most recent login this process life; the durable account stays in the web-login domain, so consumers read it only for display.',
+  },
+  {
     key: 'clientModules',
     pkg: 'client-modules',
     title: 'Client plugin graph host',
@@ -653,6 +661,13 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'core',
     consumers: ['webhook-github'],
     note: 'Provider adapters dispatch authenticated deliveries; trusted plugins register independent process-local rules, and the runtime turns non-null results into ordinary Workspace-backed Sessions without delivery or completion state.',
+  },
+  {
+    key: 'workbench',
+    pkg: 'workbench',
+    title: 'Host workbench credits and team status',
+    mode: 'core',
+    note: 'Owns the credits storage domain and the roster-vs-session team fold, serving both through the workbench Typert Remote namespace for browser surfaces.',
   },
   {
     key: 'lsp',

@@ -140,7 +140,7 @@ describe('BrowserAuth', () => {
     })
   })
 
-  it('accepts the cookie for index serving and gives every unauthenticated request one response', async () => {
+  it('accepts the cookie for index serving and redirects every unauthenticated request to the login page', async () => {
     const auth = await createAuth(new RecordCredentials())
     const { cookie } = exchange(auth)
     const allowed = response()
@@ -156,15 +156,25 @@ describe('BrowserAuth', () => {
     ]) {
       const denied = response()
       expect(auth.authorizeIndex(candidate, denied.value)).toBe(false)
-      expect(denied.state.status).toBe(401)
-      expect(denied.state.headers).toEqual({
-        'cache-control': 'no-store',
-        'content-type': 'text/plain; charset=utf-8',
+      expect(denied.state).toEqual({
+        status: 303,
+        headers: {
+          'cache-control': 'no-store',
+          'location': '/login',
+          'referrer-policy': 'no-referrer',
+        },
+        body: candidate.method === 'HEAD' ? undefined : '',
       })
-      expect(denied.state.body).toBe(candidate.method === 'HEAD'
-        ? undefined
-        : 'dsh web authentication required; reopen the URL printed by dsh web.\n')
     }
+  })
+
+  it('keeps the token exchange first so the printed URL still mints', async () => {
+    const auth = await createAuth(new RecordCredentials())
+    const minted = exchange(auth)
+    expect(minted.state.status).toBe(303)
+    const stale = response()
+    expect(auth.authorizeIndex(request('/?token=wrong'), stale.value)).toBe(false)
+    expect(stale.state).toMatchObject({ status: 303, headers: { location: '/login' } })
   })
 
   it('rejects tampering, expiry, future issuance, and a longer lifetime than configured', async () => {
@@ -188,10 +198,11 @@ describe('BrowserAuth', () => {
     const invalidPayloads: unknown[] = [
       'not json',
       null,
-      { version: 2, authority: '127.0.0.1:3080', issuedAt: Date.now(), expiresAt: Date.now() + 1000 },
+      { version: 3, authority: '127.0.0.1:3080', issuedAt: Date.now(), expiresAt: Date.now() + 1000 },
       { version: 1, authority: 42, issuedAt: Date.now(), expiresAt: Date.now() + 1000 },
       { version: 1, authority: '127.0.0.1:3080', issuedAt: 'now', expiresAt: Date.now() + 1000 },
       { version: 1, authority: '127.0.0.1:3080', issuedAt: Date.now(), expiresAt: 'later' },
+      { version: 2, authority: '127.0.0.1:3080', issuedAt: Date.now(), expiresAt: Date.now() + 1000, subject: 42 },
     ]
     for (const payload of invalidPayloads) {
       expect(auth.isAuthenticated(request('/', '127.0.0.1:3080', {
@@ -205,6 +216,65 @@ describe('BrowserAuth', () => {
     expect(auth.isAuthenticated(request('/', '127.0.0.1:3080', { cookie }))).toBe(false)
     vi.setSystemTime(new Date('2026-08-23T00:00:00.000Z'))
     expect(auth.isAuthenticated(request('/', '127.0.0.1:3080', { cookie }))).toBe(false)
+  })
+
+  it('mints a subject-bound v2 cookie and reads its subject back', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-11T00:00:00.000Z'))
+    const store = new RecordCredentials()
+    const auth = await createAuth(store)
+    const headers = { host: '127.0.0.1:3080' }
+
+    const minted = auth.mintSessionCookie(headers, '13800001234')
+    expect(minted).toMatchObject({
+      maxAgeSeconds: 2592000,
+      expiresAt: Date.now() + 2592000 * 1000,
+    })
+    expect(minted?.value.startsWith('v2.')).toBe(true)
+    const setCookie = `${minted?.name}=${minted?.value}`
+    expect(auth.isAuthenticated(request('/', '127.0.0.1:3080', { cookie: setCookie }))).toBe(true)
+    expect(auth.subjectOf(request('/', '127.0.0.1:3080', { cookie: setCookie }))).toBe('13800001234')
+    expect(auth.subjectOf({ headers: new Headers({ host: '127.0.0.1:3080', cookie: setCookie }) }))
+      .toBe('13800001234')
+
+    // Anonymous mints stay valid sessions without a subject.
+    const anonymous = auth.mintSessionCookie(headers)
+    expect(anonymous?.value.startsWith('v1.')).toBe(true)
+    const anonymousCookie = `${anonymous?.name}=${anonymous?.value}`
+    expect(auth.isAuthenticated(request('/', '127.0.0.1:3080', { cookie: anonymousCookie }))).toBe(true)
+    expect(auth.subjectOf(request('/', '127.0.0.1:3080', { cookie: anonymousCookie }))).toBeUndefined()
+    expect(auth.subjectOf({ headers: { host: '127.0.0.1:3080' } })).toBeUndefined()
+
+    // The clearing header carries the expired attributes for the caller's Set-Cookie.
+    const cleared = auth.clearSessionCookie(headers)
+    expect(cleared).toMatch(/^dsh-auth-.+=; Max-Age=0; Path=\/; Expires=/u)
+    expect(cleared).toContain('HttpOnly; SameSite=Strict')
+
+    // An expired v2 cookie authenticates nothing and reads no subject.
+    vi.setSystemTime(new Date('2026-10-12T00:00:00.000Z'))
+    expect(auth.isAuthenticated(request('/', '127.0.0.1:3080', { cookie: setCookie }))).toBe(false)
+    expect(auth.subjectOf(request('/', '127.0.0.1:3080', { cookie: setCookie }))).toBeUndefined()
+  })
+
+  it('honors the optional persistence override on minted session cookies', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-11T00:00:00.000Z'))
+    const store = new RecordCredentials()
+    const auth = await createAuth(store)
+    const headers = { host: '127.0.0.1:3080' }
+
+    // Persistence 0 encodes a session cookie (browser-lifetime, no Max-Age);
+    // the signed payload expiry stays on the configured default lifetime.
+    const session = auth.mintSessionCookie(headers, '13800001234', 0)
+    expect(session).toMatchObject({ maxAgeSeconds: 0, expiresAt: Date.now() + 2592000 * 1000 })
+
+    // An explicit persistence replaces only the Max-Age, not the payload expiry.
+    const week = auth.mintSessionCookie(headers, '13800001234', 7 * 24 * 60 * 60 * 1000)
+    expect(week).toMatchObject({ maxAgeSeconds: 604800, expiresAt: Date.now() + 2592000 * 1000 })
+
+    // Omitting the argument keeps the configured default lifetime.
+    const byDefault = auth.mintSessionCookie(headers, '13800001234')
+    expect(byDefault).toMatchObject({ maxAgeSeconds: 2592000 })
   })
 
   it('loads one secret per activation and replaces it after deletion on the next activation', async () => {

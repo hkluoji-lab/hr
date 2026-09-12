@@ -65,6 +65,7 @@
    render stays static. */
 .railIn .iconButton,
 .railIn .newSession,
+.railIn .navArea,
 .railIn .regionArea {
   animation: rail-in 150ms var(--ds-ease-in-out) backwards;
 }
@@ -296,6 +297,24 @@
   max-width: 0;
 }
 
+/* Primary navigation seat: registrant-owned entries stack vertically under
+   New Session, above the browsing region. Long registrant content (expanded
+   role groups) shrinks the seat and scrolls inside it before the browsing
+   region or the settings footer can leave the viewport. */
+.navArea {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 4px;
+  overflow-y: auto;
+}
+
+.collapsed .navArea {
+  align-items: center;
+  margin-bottom: 8px;
+}
+
 /* Region seat: always mounted so the foot never moves. Its trailing margin
    cancels the wide shell inset so the nested scrollbar can sit at the sidebar
    edge; the browser restores that inset inside its own rows. */
@@ -351,6 +370,7 @@
   .fading > *,
   .railIn .iconButton,
   .railIn .newSession,
+  .railIn .navArea,
   .railIn .footArea,
   .railIn .regionArea {
     transition: none;

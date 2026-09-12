@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-本包渲染已完成轮次末尾的产出文件行——列出修改工具创建或修改的文件——并把收尾正文中匹配的行内代码引用转为链接，让被点名的文件在宿主中打开。词表来自修改工具自身的 `locations`，而非收尾正文——无论模型是否记得点名，产出文件都会被列出。正式提供的组合中只有 Web patch 加载本包；删除其 cordis.yml 条目会同时移除指引、文件行与正文链接。
+本包渲染已完成轮次末尾的产出文件行——修改工具创建或修改的文件——并把收尾正文中匹配的行内代码引用转为链接，让被点名的文件在宿主中打开。词表来自工具自身的 `locations`，而非正文：无论模型是否点名，产出文件都会被列出。本包还发布可选的 `sessionDeliverables` 服务，把同一份词表应用于整个会话窗口，供「工作台交付物 tab」等表面使用。正式组合中只有 Web patch 加载本包；删除其 cordis.yml 条目会同时移除所有表面。
 
 ## 目录
 
@@ -35,6 +35,10 @@ kind: "package-reference"
 
 收尾正文承载同一份词表：行内代码 token 按精确路径解析，或当它恰好等于某条产出路径的 basename 且该路径唯一时解析——两条路径共享同一 basename 时保持惰性而不猜测，因此提及绝不打开错误的文件。解析成功的提及保留代码标签，并采用 Markdown 样式表的链接样式，完整路径作为其 `title`。
 
+### 会话级折叠
+
+其他浏览器表面通过可选的 `sessionDeliverables` Cordis 服务（而非 value import）使用该词表：`produced(events)` 把一个会话的持久事件折叠为按首次出现去重的产出文件（`{ path, name }`），接受调用与失败规则与按轮次 definition 完全相同。服务缺失——本插件被组合掉——是显式的关闭态，由消费方渲染自己的空表面。
+
 -----
 
 <a id="understand-the-implementation"></a>
@@ -43,7 +47,7 @@ kind: "package-reference"
 <details>
 <summary>实现细节——点击展开</summary>
 
-Node 半部注册静态 `ui:deliverable-file-references` 系统提示词段，要求模型点名成功创建或修改的主要文件，并把这些文件以及正文中提到的其他本轮变更文件写成 Markdown 行内代码。浏览器半部把 `ProducedFiles` 注册进 chat 视图的 `conversation.chat.turnTail` 洞。`deliverablesDefinition` 根据 `write`、`edit` 和有修改作用的 `str_replace_editor` 命令中经过校验的原始参数，把每个轮次成功的第一方修改调用折叠进 `DeliverablesTurnData`。读取、删除、不受支持的工具、格式错误的调用和失败结果不贡献任何条目。新的修改工具必须增加显式 Client contribution 才能加入列表。本包还提供 chat 视图按收尾消息查询的 `chatFileMentions` 服务；把插件组合出去会同时移除两个表面，视图的空链以零成本留下。
+Node 半部注册静态 `ui:deliverable-file-references` 系统提示词段，要求模型点名成功创建或修改的主要文件，并把这些文件以及正文中提到的其他本轮变更文件写成 Markdown 行内代码。浏览器半部把 `ProducedFiles` 注册进 chat 视图的 `conversation.chat.turnTail` 洞。`deliverablesDefinition` 根据 `write`、`edit` 和有修改作用的 `str_replace_editor` 命令中经过校验的原始参数，把每个轮次成功的第一方修改调用折叠进 `DeliverablesTurnData`。读取、删除、不受支持的工具、格式错误的调用和失败结果不贡献任何条目。新的修改工具必须增加显式 Client contribution 才能加入列表。本包还提供 chat 视图按收尾消息查询的 `chatFileMentions` 服务；把插件组合出去会同时移除两个表面，视图的空链以零成本留下。`producedPathsFromEvents` 是对完整会话窗口的同一折叠（一张 call-id map 覆盖所有轮次）；浏览器半部通过可选的 `sessionDeliverables` 服务发布它，让会话级消费方共享策略而无需跨插件 value import。
 
 </details>
 

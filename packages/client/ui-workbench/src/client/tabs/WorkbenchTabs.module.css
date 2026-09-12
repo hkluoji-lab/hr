@@ -1,0 +1,158 @@
+.root {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 0 8px;
+  color: var(--dsw-alias-label-primary);
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: 1.5;
+}
+
+.header {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 10px;
+  color: var(--dsw-alias-label-secondary);
+  font-weight: 500;
+}
+
+.headerIcon {
+  flex: 0 0 auto;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  padding: 3px 10px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.rowIcon {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 16px;
+}
+
+.dotSlot {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.rowName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.rowStatus {
+  flex: 0 0 auto;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.empty {
+  margin: 0;
+  padding: 8px 10px;
+  color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary));
+}
+
+.balance {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin: 0;
+  padding: 4px 10px 8px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.balanceValue {
+  color: var(--dsw-alias-label-primary);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 2px 10px 8px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.count {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.countValue {
+  color: var(--dsw-alias-label-primary);
+  font-weight: 600;
+}
+
+.countLabel {
+  font-size: 12px;
+}
+
+.entry {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  padding: 3px 10px;
+}
+
+.entryAmount {
+  flex: 0 0 auto;
+  color: var(--dsw-alias-label-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.entryReason {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.entryTime {
+  flex: 0 0 auto;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}

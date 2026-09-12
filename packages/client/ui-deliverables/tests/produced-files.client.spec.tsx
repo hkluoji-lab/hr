@@ -23,7 +23,8 @@ import type { ChatFileMentions, TurnTailOwnerProps } from '@deepseek-ai/dsh-clie
 import { makeTranslate, stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
 import { ProducedFiles } from '../src/client/ProducedFiles.tsx'
 import {
-  basename, deliverablesDefinition, producedFileMentions, producedForClosing, selectProducedFiles,
+  basename, deliverablesDefinition, producedFileMentions, producedForClosing,
+  producedPathsFromEvents, selectProducedFiles,
   type DeliverablesTurnData,
 } from '../src/client/turn-deliverables.ts'
 import { apply, inject } from '../src/client/index.ts'
@@ -403,6 +404,29 @@ describe('produced-file Turn data', () => {
   })
 })
 
+describe('producedPathsFromEvents session fold', () => {
+  it('folds successful mutations across turns, unique and first-seen, skipping failed and read calls', () => {
+    const events = [
+      at(1, 'turn/start', { turn: 1 }),
+      call(2, 'write-ok', 'write', { file_path: 'one.txt', content: 'x' }),
+      result(3, 'write-ok'),
+      call(4, 'write-failed', 'write', { file_path: 'two.txt', content: 'y' }),
+      result(5, 'write-failed', true),
+      call(6, 'read-one', 'read', { file_path: 'one.txt' }),
+      result(7, 'read-one'),
+      at(8, 'turn/start', { turn: 2 }),
+      call(9, 'edit-one', 'edit', { file_path: 'one.txt', old_string: 'x', new_string: 'z' }),
+      result(10, 'edit-one'),
+    ].map(entry => entry.event)
+
+    expect(producedPathsFromEvents(events)).toEqual(['one.txt'])
+  })
+
+  it('answers nothing for a window with no successful mutation', () => {
+    expect(producedPathsFromEvents([])).toEqual([])
+  })
+})
+
 describe('ProducedFiles row', () => {
   const t = makeTranslate(zh)
 
@@ -532,9 +556,21 @@ describe('plugin registration', () => {
     // A turn that produced nothing yields no vocabulary at all.
     expect(service?.forClosing(tailOwner(undefined, 2))).toBeUndefined()
 
+    // The session-wide service folds a whole event window the same way.
+    const sessionService = (ctx as unknown as {
+      get(name: 'sessionDeliverables'):
+        { produced(events: readonly SessionEvent[]): readonly { path: string; name: string }[] } | undefined
+    }).get('sessionDeliverables')
+    const folded = sessionService?.produced([
+      call(2, 'w', 'write', { file_path: 'docs/plan.md', content: 'x' }),
+      result(3, 'w'),
+    ].map(entry => entry.event))
+    expect(folded).toEqual([{ path: 'docs/plan.md', name: 'plan.md' }])
+
     await fiber.dispose()
     expect(ctx.slots.entries('conversation.chat.turnTail')).toHaveLength(0)
     // Fiber teardown retracts the service: the consumer's ctx.get sees the off state.
     expect((ctx as unknown as { get(name: string): unknown }).get('chatFileMentions')).toBeUndefined()
+    expect((ctx as unknown as { get(name: string): unknown }).get('sessionDeliverables')).toBeUndefined()
   })
 })

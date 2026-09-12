@@ -1,0 +1,190 @@
+/* Workbench hero dashboard: the pink/purple secretary-company home. Scoped to
+   the blank-session hero; every color carries a fallback so the page stays
+   legible under a theme that redefines the surface tokens. */
+
+.root {
+  width: 100%;
+  max-width: 600px;
+  margin: 6px auto 4px;
+  padding: 0 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 18px;
+  color: #2a2230;
+}
+
+/* The hero content column; below the wide breakpoint it is the whole hero. */
+.main {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 18px;
+  min-width: 0;
+}
+
+/* Wide viewports give the side-card stack a real grid column so the core
+   workspace row below the hero keeps its full width untouched. Hero content
+   keeps the 600px reading measure while the member row fills the column. */
+@media (min-width: 1300px) {
+  .root {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 288px;
+    gap: 28px;
+    align-items: start;
+    max-width: none;
+    margin: 6px 24px 4px;
+  }
+
+  .main {
+    width: auto;
+  }
+
+  .main > * {
+    max-width: 600px;
+    margin-inline: auto;
+  }
+
+  .main > .memberGrid {
+    max-width: 1120px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.greeting {
+  margin: 0;
+  text-align: center;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  color: #2b2430;
+}
+
+.userName {
+  color: #dd5d99;
+}
+
+.subtitle {
+  margin: 0;
+  text-align: center;
+  font-size: 13.5px;
+  color: #978da2;
+}
+
+.quickGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.quickCard {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 17px 20px;
+  border: 1px solid #eee8f2;
+  border-radius: 15px;
+  background: #ffffff;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.quickCard:hover {
+  border-color: #d9b8e6;
+  box-shadow: 0 8px 22px rgba(180, 120, 232, 0.14);
+  transform: translateY(-1px);
+}
+
+.quickIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border-radius: 12px;
+  background: #f2ebfb;
+  color: #8f63d6;
+}
+
+.quickLabel {
+  font-size: 15.5px;
+  font-weight: 600;
+  color: #37303d;
+}
+
+.stats {
+  margin: 2px 0 0;
+  padding: 14px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  border-top: 1px dashed #e7e0ea;
+  border-bottom: 1px dashed #e7e0ea;
+}
+
+.stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 0 22px;
+}
+
+.stat + .stat {
+  border-left: 1px solid #eee9f1;
+}
+
+.statLabel {
+  margin: 0;
+  font-size: 13px;
+  color: #978da2;
+  white-space: nowrap;
+}
+
+.statValue {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #37303d;
+  font-variant-numeric: tabular-nums;
+}
+
+.teamHeader {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.teamLine {
+  flex: 1;
+  height: 1px;
+  background: #ece5ef;
+}
+
+.teamTitle {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #978da2;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.teamEmpty {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  color: #978da2;
+}
+
+/* The roster is exactly the four company roles, so the columns are
+   deterministic: 2×2 below the wide breakpoint, one row of four on wide
+   frames — auto-fit's ragged 3+1 row never appears. */
+.memberGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}

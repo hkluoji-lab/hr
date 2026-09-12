@@ -161,6 +161,18 @@ export interface HostConnectionRpc {
   ): () => Promise<void>
 }
 
+/** One `Set-Cookie`-ready session cookie issued by Connection. */
+export interface IssuedSessionCookie {
+  /** Cookie name, authority-bound. */
+  readonly name: string
+  /** Signed cookie value. */
+  readonly value: string
+  /** Lifetime in seconds for the `Max-Age` attribute. */
+  readonly maxAgeSeconds: number
+  /** Absolute expiry for the `Expires` attribute. */
+  readonly expiresAt: number
+}
+
 /** Host `ctx.connection` shape consumed by transport-independent adapters. */
 export interface HostConnectionHandle {
   /** Generic RPC channel registry. */
@@ -184,7 +196,8 @@ export interface HostConnectionHandle {
   requestRejection(request: ConnectionTrustRequest): ConnectionRequestRejection
 
   /**
-   * Authenticate one frontend index request, owning a token redirect or 401.
+   * Authenticate one frontend index request, owning the token exchange or the
+   * login redirect.
    * @param request - root or configured-index HTTP request.
    * @param response - response owned when the result is false.
    * @returns true only when the frontend may serve index.html.
@@ -197,6 +210,36 @@ export interface HostConnectionHandle {
    * @returns root URL accepted by {@link authorizeIndex} for initial login.
    */
   authenticatedUrl(baseUrl: string): string
+
+  /**
+   * Mint one authority-bound session cookie for the request's authority,
+   * optionally naming the logged-in account subject.
+   * @param request - request headers carrying Host.
+   * @param subject - logged-in account identity baked into the cookie.
+   * @param persistenceMilliseconds - browser-persistence window; omit for the
+   *   configured default. Zero mints a browser-session cookie (no `Max-Age`/
+   *   `Expires` attributes) while the signed payload keeps the default validity.
+   * @returns the issued cookie, or undefined when the request names no authority.
+   */
+  issueSessionCookie(
+    request: ConnectionTrustRequest,
+    subject?: string,
+    persistenceMilliseconds?: number,
+  ): IssuedSessionCookie | undefined
+
+  /**
+   * The expired `Set-Cookie` value clearing the request authority's session cookie.
+   * @param request - request headers carrying Host.
+   * @returns the clearing header value, or undefined when the request names no authority.
+   */
+  clearSessionCookie(request: ConnectionTrustRequest): string | undefined
+
+  /**
+   * Read the logged-in account subject from the request's valid session cookie.
+   * @param request - request headers carrying Host and Cookie.
+   * @returns the subject, or undefined for anonymous sessions and invalid cookies.
+   */
+  sessionSubject(request: ConnectionTrustRequest): string | undefined
 }
 
 /** Transport-independent Fetch handler used by HTTP and worker carriers. */

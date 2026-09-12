@@ -215,7 +215,7 @@ export interface Config {
 }
 ```
 
-来源：[`packages/api/session-controller/src/index.ts:69`](../packages/api/session-controller/src/index.ts)
+来源：[`packages/api/session-controller/src/index.ts:70`](../packages/api/session-controller/src/index.ts)
 
 <a id="deepseek-aidsh-api-settings-controller"></a>
 
@@ -383,7 +383,7 @@ export interface ConnectionRecoveryConfig {
 }
 ```
 
-来源： [`packages/client/connection/src/index.ts:72`](../packages/client/connection/src/index.ts)
+来源： [`packages/client/connection/src/index.ts:73`](../packages/client/connection/src/index.ts)
 
 <a id="deepseek-aidsh-client-hmr"></a>
 
@@ -1692,7 +1692,7 @@ export interface Config {
 }
 ```
 
-来源：[`packages/llm/plugin-package-inventory-deepseek/src/index.ts:31`](../packages/llm/plugin-package-inventory-deepseek/src/index.ts)
+来源：[`packages/llm/plugin-package-inventory-deepseek/src/index.ts:38`](../packages/llm/plugin-package-inventory-deepseek/src/index.ts)
 
 <a id="deepseek-aidsh-pwsh-local"></a>
 
@@ -2675,7 +2675,7 @@ export interface Config {
 }
 ```
 
-来源：[`packages/context/time-context/src/index.ts:48`](../packages/context/time-context/src/index.ts)
+来源：[`packages/context/time-context/src/index.ts:49`](../packages/context/time-context/src/index.ts)
 
 <a id="deepseek-aidsh-tmux-context"></a>
 
@@ -3220,7 +3220,7 @@ export interface Config {
 export type ApprovalPolicy = 'ask' | 'never'
 ```
 
-来源：[`packages/interaction/user-approval/src/index.ts:126`](../packages/interaction/user-approval/src/index.ts)
+来源：[`packages/interaction/user-approval/src/index.ts:127`](../packages/interaction/user-approval/src/index.ts)
 
 <a id="deepseek-aidsh-web"></a>
 
@@ -3293,6 +3293,34 @@ export interface Config {
 ```
 
 来源：[`packages/web/web-fetch-http/src/index.ts:32`](../packages/web/web-fetch-http/src/index.ts)
+
+<a id="deepseek-aidsh-web-login"></a>
+
+## `@deepseek-ai/dsh-web-login`
+
+需要：`webServer` · `connection` · `storageDomain`
+
+```ts config-catalog
+/** Web-login plugin configuration. */
+export interface Config {
+  /** Minimum gap between two sends for one phone, in seconds. */
+  readonly codeCooldownSeconds: number
+  /** How long one code stays verifiable, in seconds. */
+  readonly codeValiditySeconds: number
+  /** Wrong verifications allowed before one challenge is destroyed. */
+  readonly maxVerificationAttempts: number
+  /**
+   * Whether `POST /auth/register` demands an SMS code beside the password.
+   * False creates the account from a phone and a password alone, so a
+   * deployment with no SMS provider can still register accounts.
+   */
+  readonly requireRegistrationCode: boolean
+  /** How long one member invite stays redeemable, in seconds. */
+  readonly inviteValiditySeconds: number
+}
+```
+
+来源：[`packages/host/web-login/src/index.ts:83`](../packages/host/web-login/src/index.ts)
 
 <a id="deepseek-aidsh-web-search-deepseek"></a>
 
@@ -3392,6 +3420,24 @@ export interface Config {
 
 来源：[`packages/webhook/webhook-github/src/index.ts:17`](../packages/webhook/webhook-github/src/index.ts)
 
+<a id="deepseek-aidsh-workbench"></a>
+
+## `@deepseek-ai/dsh-workbench`
+
+需要：`storageDomain` · `agentPresets` · `sessions` · `sessionProjections`
+
+```ts config-catalog
+/** The user-writable plugin config. */
+export interface Config {
+  /** Balance a fresh medium serves before the first grant. */
+  startingBalance: number
+  /** Largest amount one grant may carry. */
+  maxGrant: number
+}
+```
+
+来源：[`packages/workbench/workbench/src/index.ts:141`](../packages/workbench/workbench/src/index.ts)
+
 <a id="deepseek-aidsh-workflow-worker-thread"></a>
 
 ## `@deepseek-ai/dsh-workflow-worker-thread`
@@ -3474,6 +3520,7 @@ export interface Config {
 - `@deepseek-ai/dsh-client-ui-tool`（[`packages/client/ui-tool/src/index.ts`](../packages/client/ui-tool/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-trajectory`（[`packages/client/ui-trajectory/src/index.ts`](../packages/client/ui-trajectory/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-user-questions`（[`packages/client/ui-user-questions/src/index.ts`](../packages/client/ui-user-questions/src/index.ts)）
+- `@deepseek-ai/dsh-client-ui-workbench`（[`packages/client/ui-workbench/src/index.ts`](../packages/client/ui-workbench/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-workflow-run`（[`packages/client/ui-workflow-run/src/index.ts`](../packages/client/ui-workflow-run/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-workspace`（[`packages/client/ui-workspace/src/index.ts`](../packages/client/ui-workspace/src/index.ts)）
 - `@deepseek-ai/dsh-command-compact` — 需要 `commands` · `compact`（[`packages/compaction/command-compact/src/index.ts`](../packages/compaction/command-compact/src/index.ts)）

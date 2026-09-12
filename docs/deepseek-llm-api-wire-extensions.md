@@ -63,7 +63,7 @@ After the configured endpoint returns HTTP 2xx, the adapter runs the prepared `a
 | `packages[].name` | string | Exact non-empty npm package name from the owning manifest |
 | `packages[].version` | string | Exact non-empty package version from the same manifest |
 
-Every request re-reads active non-group Loader entries from the host tree and, when available for the request Session, its standing agent-preset tree. Relative and absolute modules use their nearest owning manifest; bare package entries follow the Loader resolution base that activated them. A named manifest without a non-empty version fails request preparation.
+Every request re-reads active non-group Loader entries from the host tree and, when available for the request Session, its standing agent-preset tree. Relative and absolute modules use their nearest owning manifest; bare package entries follow the Loader resolution base that activated them. Malformed package metadata, and a live entry whose package is no longer resolvable on disk (typically a package removed without restarting the host), drop that row with a warning: this field is telemetry, so the request still carries every row that did resolve.
 
 The sender deduplicates exact `(name, version)` pairs and sorts first by `name`, then by `version`, with a locale-independent text comparison. Simultaneously active versions of one package remain separate entries. Receivers must not collapse the array by package name or infer package activation from array order.
 

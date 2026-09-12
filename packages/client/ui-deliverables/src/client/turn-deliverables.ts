@@ -4,6 +4,7 @@
  * calls, never presentation data or the closing prose.
  */
 import { isAppendSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
+import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type { TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { ConversationNodeDefinition } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -142,6 +143,39 @@ export function producedForClosing(
 export function selectProducedFiles(owner: TurnTailOwnerProps): readonly string[] | null {
   const paths = producedForClosing(owner.turn.data.get('deliverables'), owner.seq)
   return paths.length === 0 ? null : paths
+}
+
+/**
+ * Fold one session's complete event window into the unique paths its
+ * successful first-party mutation calls produced, in first-seen order.
+ *
+ * Same vocabulary as the per-turn Definition — `write`, `edit`, and mutating
+ * `str_replace_editor` calls that settle without an error — but session-wide:
+ * call ids are unique within a session, so one calls map covers every turn and
+ * a path written in several turns lists once. Read and failed calls contribute
+ * nothing. Surfaces that show the session as a whole (the right-Sidebar
+ * deliverables tab) read this instead of re-deriving the mutation policy.
+ * @param events - durable session events in log order (transient rows dropped by the caller).
+ * @returns produced paths, unique and first-seen ordered; empty when the session wrote nothing.
+ */
+export function producedPathsFromEvents(events: readonly SessionEvent[]): readonly string[] {
+  const calls = new Map<string, string | null>()
+  const paths: string[] = []
+  const seen = new Set<string>()
+  for (const event of events) {
+    if (event.type === 'tool/call') {
+      calls.set(String(event.data.callId), mutationPath(event.data.name, event.data.arguments))
+      continue
+    }
+    if (event.type !== 'tool/result' || !isAppendSurfaceEvent(event)) continue
+    const result = event.data.message.content[0]
+    if (result.isError === true) continue
+    const path = calls.get(String(event.data.message.source.callId))
+    if (path === null || path === undefined || seen.has(path)) continue
+    seen.add(path)
+    paths.push(path)
+  }
+  return paths
 }
 
 /** Turn-local successful mutation accumulator; it publishes no view Node. */

@@ -26,6 +26,7 @@ import type {
   ConnectionTrustRequest,
   HostConnectionHandle,
   HostConnectionRpc,
+  IssuedSessionCookie,
 } from './rpc.ts'
 
 const INVALID_REQUEST_RPC_ID = RpcId('invalid-request')
@@ -107,6 +108,25 @@ export class HostConnectionService extends Service implements HostConnectionHand
   /** Add this process's launch token to the clean application URL. */
   authenticatedUrl(baseUrl: string): string {
     return this.browserAuth.authenticatedUrl(baseUrl)
+  }
+
+  /** Mint one authority-bound session cookie, optionally naming the logged-in account. */
+  issueSessionCookie(
+    request: ConnectionTrustRequest,
+    subject?: string,
+    persistenceMilliseconds?: number,
+  ): IssuedSessionCookie | undefined {
+    return this.browserAuth.mintSessionCookie(request.headers, subject, persistenceMilliseconds)
+  }
+
+  /** The expired `Set-Cookie` value clearing the request authority's session cookie. */
+  clearSessionCookie(request: ConnectionTrustRequest): string | undefined {
+    return this.browserAuth.clearSessionCookie(request.headers)
+  }
+
+  /** Read the logged-in account subject from the request's valid session cookie. */
+  sessionSubject(request: ConnectionTrustRequest): string | undefined {
+    return this.browserAuth.subjectOf(request)
   }
 
   /**

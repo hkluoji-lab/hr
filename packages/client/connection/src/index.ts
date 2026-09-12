@@ -29,6 +29,7 @@ export type {
   HostConnectionHandle,
   HostConnectionFetch,
   HostConnectionRpc,
+  IssuedSessionCookie,
   RpcMessage,
   ServerResponse,
 } from './rpc.ts'

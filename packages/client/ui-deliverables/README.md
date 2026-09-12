@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-This package renders the deliverables row a finished turn ends with — the files the mutation tools created or modified — and links matching inline-code references in the closing prose, so a mentioned file opens in the Host. The vocabulary comes from the mutation tools' own `locations`, never from the closing prose — a produced file is listed whether or not the model remembered to name it. The shipped Web patch is the only composition that loads this package; removing its cordis.yml entry removes the guidance, row, and prose links together.
+This package renders the deliverables row a finished turn ends with — files the mutation tools created or modified — and links matching inline-code references in the closing prose, so a mentioned file opens in the Host. The vocabulary comes from the tools' own `locations`, never the prose: a produced file is listed whether or not the model named it. It also publishes the optional `sessionDeliverables` service, applying the same vocabulary to one whole session window for surfaces like the Workbench Deliverables tab. Only the shipped Web patch loads this package; removing its cordis.yml entry removes all surfaces together.
 
 ## Table of Contents
 
@@ -35,6 +35,10 @@ The row uses CSS container-width bands to show a responsive prefix of up to six 
 
 The closing prose carries the same vocabulary: an inline-code token resolves by exact path, or by being exactly the basename of exactly one produced path — a basename two paths share stays inert rather than guessing, so a mention can never open the wrong file. A resolved mention keeps its code chip and takes the markdown sheet's link language, with the full path as its title.
 
+### Session-wide fold
+
+Other browser surfaces reach the vocabulary through the optional `sessionDeliverables` Cordis service rather than importing it: `produced(events)` folds one session's durable events into unique first-seen produced files (`{ path, name }`), applying the same accepted-call and failure rules as the per-turn definition. Its absence — this plugin composed out — is the explicit off state, so a consumer renders its own empty surface.
+
 -----
 
 <a id="understand-the-implementation"></a>
@@ -43,7 +47,7 @@ The closing prose carries the same vocabulary: an inline-code token resolves by 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-The Node half registers the static `ui:deliverable-file-references` system-prompt section asking the model to mention primary files from successful creation or modification calls and to write those and any other changed-file references as Markdown inline code. The browser half registers `ProducedFiles` into the chat view's `conversation.chat.turnTail` hole. `deliverablesDefinition` folds each Turn's successful first-party mutation calls into `DeliverablesTurnData` from the validated raw arguments of `write`, `edit`, and mutating `str_replace_editor` commands. Reads, deletes, unsupported tools, malformed calls, and failed results contribute nothing. A new mutation tool needs an explicit Client contribution before it joins the list. The package also provides the `chatFileMentions` service the chat view consults per closing message; composing the plugin out removes both surfaces and leaves the view's empty chain at zero cost.
+The Node half registers the static `ui:deliverable-file-references` system-prompt section asking the model to mention primary files from successful creation or modification calls and to write those and any other changed-file references as Markdown inline code. The browser half registers `ProducedFiles` into the chat view's `conversation.chat.turnTail` hole. `deliverablesDefinition` folds each Turn's successful first-party mutation calls into `DeliverablesTurnData` from the validated raw arguments of `write`, `edit`, and mutating `str_replace_editor` commands. Reads, deletes, unsupported tools, malformed calls, and failed results contribute nothing. A new mutation tool needs an explicit Client contribution before it joins the list. The package also provides the `chatFileMentions` service the chat view consults per closing message; composing the plugin out removes both surfaces and leaves the view's empty chain at zero cost. `producedPathsFromEvents` is the same fold over one complete session window (one call-id map covers every turn); the browser half publishes it through the optional `sessionDeliverables` service so session-wide consumers share the policy without a cross-plugin value import.
 
 </details>
 
