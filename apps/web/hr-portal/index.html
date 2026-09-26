@@ -432,7 +432,24 @@ body.rb-collapsed #root{width:100vw}
     return null
   }
 
+  /* 原生 workbench 自带首页 hero（data-workbench-hero）：问候语、四个快捷卡、任务统计
+     与成员卡都由原生渲染，文案走 locale、姓名与角色取真实登录状态。此时门户注入的
+     问候语与快捷区退位，否则同屏出现两份问候与两套同名按钮。 */
+  function hasNativeWorkbenchHero(doc) {
+    var hero = doc.querySelector('[data-workbench-hero]')
+    return !!hero && !hero.closest('.hrp-home')
+  }
+
   function ensureHome(doc) {
+    if (hasNativeWorkbenchHero(doc)) {
+      /* 撤掉门户注入节点与门户贴底布局，首页布局交还原生 hero 自身 */
+      clearHeroLayout(doc)
+      var home = doc.querySelector('[data-hrp-home]')
+      if (home) home.removeAttribute('data-hrp-home')
+      var injected = doc.querySelectorAll('.hrp-home')
+      for (var i = 0; i < injected.length; i++) injected[i].parentNode.removeChild(injected[i])
+      return
+    }
     var stack = findHeroStack(doc)
     if (!stack) return
     stack.setAttribute('data-hrp-home', '1')

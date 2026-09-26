@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-26-six-role-company-roster.md
-2026-09-26-six-role-company-roster.md: d3c51eef5bce10b9141309da7f26901338f0ce5c
-2026-09-26-six-role-company-roster.zh.md: 431b93ca819d50ccdc9357b05fcfa2de9657f235
+2026-09-26-six-role-company-roster.md: 7f53b67a79ff1060c608723cff4c99586a6ab3bd
+2026-09-26-six-role-company-roster.zh.md: 885ea54aa0609e2f716be149ca737121ae2bfb52

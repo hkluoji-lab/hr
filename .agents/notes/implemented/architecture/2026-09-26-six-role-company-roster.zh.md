@@ -26,7 +26,7 @@ Status: implemented
 
 **布局跟随数量。** 仪表盘成员栅格从一排四个改为三个一行（`repeat(3, …)`、`max-width: 1040px`，≥1400px 时放宽到 `1160px`），让六张卡排成均衡的两行。
 
-**门户层为工作台让位。** 托管门户（`apps/web/hr-portal/index.html`，由 `install.mjs` 合并进构建产物 `apps/web/dist/index.html`）探测所服务的文档里是否存在工作台自己的导航——一个 `aria-label` 为「任务大厅」「智能任务助手」或「AI 团队」、且不在门户自身注入容器内的 `button`——一旦发现即退位：移除自己已构建的导航并隐藏自己的右栏，只留下一条侧栏、一条右栏。不带工作台的构建则保留门户的两个表面。探测读的是实际服务的 DOM 而非构建标志，因为门户模板会被合并到它所安装的那个构建之上。
+**门户层为工作台让位。** 托管门户（`apps/web/hr-portal/index.html`，由 `install.mjs` 合并进构建产物 `apps/web/dist/index.html`）探测所服务的文档里是否存在工作台自己的表面，一旦发现即退位：一个 `aria-label` 为「任务大厅」「智能任务助手」或「AI 团队」、且不在门户自身注入容器内的 `button`，会移除门户已构建的导航并隐藏门户右栏，只留下一条侧栏、一条右栏。工作台 hero——`[data-workbench-hero]` 区块，用语言文案与登录成员自己的姓名和角色渲染问候语、四个快捷卡、任务统计与成员卡——会移除门户注入的问候语、快捷区与演示计数，并撤销门户的贴底 hero 布局，只留下一份问候语与一套快捷动作，且落在 hero 自己的布局里。不带工作台的构建则保留门户的全部表面。探测读的是实际服务的 DOM 而非构建标志，因为门户模板会被合并到它所安装的那个构建之上。
 
 ## Alternatives considered
 
@@ -44,8 +44,8 @@ Status: implemented
 
 现在预设文件、语言字典、侧栏、hero、团队页、助手与持久绑定里，一件事只有一个名字；改一个角色的名字只需改字典加 `preset.yml`，一次即覆盖所有表面。
 
-代价是明确的。每个部署的 `web_login.json` 都必须在服务启动前执行迁移，且该变更不向后兼容：读迁移后文件的旧构建会遇到它不认识的 role id。`rolePending` 返回 `null` 意味着招聘、融资、营销在 Clients 域建模其工作之前不显示待办行，而它们的卡片与一键动作照常存在。门户侧，退位是对实际服务 DOM 的运行时探测，因此不带工作台的构建仍可达门户自身的表面，而两套导航不可能同时可见。
+代价是明确的。每个部署的 `web_login.json` 都必须在服务启动前执行迁移，且该变更不向后兼容：读迁移后文件的旧构建会遇到它不认识的 role id。`rolePending` 返回 `null` 意味着招聘、融资、营销在 Clients 域建模其工作之前不显示待办行，而它们的卡片与一键动作照常存在。门户侧，退位是对实际服务 DOM 的运行时探测，因此不带工作台的构建仍可达门户自身的表面，而两套导航、两份问候语与两套快捷动作都不可能同时可见。退位逻辑跑在重复施加门户注入的观察器里，因此晚于门户首轮注入才挂载的 hero 同样会让门户的副本退位。
 
 ## Verification
 
-`packages/preset/agent-presets/tests` 钉住随包根目录即这六个预设及其顺序与跟随语言的文案；`packages/client/ui-agent-preset/tests` 钉住两份字典；`packages/host/web-login/tests` 钉住 `ROLE_IDS` 的接受；ui-workbench 规格钉住六角色栅格、导航子项、成员卡、助手控制器与 store 辅助函数；`apps/cli/tests/web-agent-presets.e2e.ts` 覆盖被服务的预设列表。本地部署上，迁移对 `web_login.json` 执行完毕，`pnpm run build` 重打了客户端 bundle，`node apps/web/hr-portal/install.mjs` 重新合并门户，并在浏览器中逐项断言被服务的页面：没有注入的门户导航、一条右栏、六个侧栏角色子项、六张渲染出的 `[data-role]` 卡片。
+`packages/preset/agent-presets/tests` 钉住随包根目录即这六个预设及其顺序与跟随语言的文案；`packages/client/ui-agent-preset/tests` 钉住两份字典；`packages/host/web-login/tests` 钉住 `ROLE_IDS` 的接受；ui-workbench 规格钉住六角色栅格、导航子项、成员卡、助手控制器与 store 辅助函数；`apps/cli/tests/web-agent-presets.e2e.ts` 覆盖被服务的预设列表。本地部署上，迁移对 `web_login.json` 执行完毕，`pnpm run build` 重打了客户端 bundle，`node apps/web/hr-portal/install.mjs` 重新合并门户，并在浏览器中逐项断言被服务的页面：没有注入的门户导航、一条右栏、六个侧栏角色子项、六张渲染出的 `[data-role]` 卡片、没有注入的门户问候语与快捷区，且每个快捷动作恰好一个按钮。
