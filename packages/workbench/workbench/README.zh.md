@@ -74,7 +74,7 @@ kind: "package-reference"
 
 发放只接受不超过 `maxGrant` 的正整数金额，以及长度 1–200 的去空白理由；其他输入以 `gateway/bad-request` 拒绝，两个存储都不变。台账页有界，因为台账只追加，每次发放都会累积一行。团队行镜像浏览器仪表盘的派生：某预设在有一个已开始（非 blank）会话投影到它时为 `busy`，发现报告损坏时为 `offline`，否则为 `online`；损坏行排在最后，`online` 把 busy 成员计为可达。
 
-客户与义务写入走同一条 wire 校验：`nameCn`、`incorporationDate`（`YYYY-MM-DD`）、`kind`（`NAR1`/`AB56`/`PTR`/`ITR`）、`periodLabel` 与 `dueDate` 必填，可选字段非空才入库，未知客户 id 以 `workbench/client-not-found` 拒绝；未知义务 id 以 `workbench/obligation-not-found` 拒绝。`daysUntilDue` 与 `dueTier` 依据当天 UTC 日期派生，`dueTier` 划出 UI 渲染的催办阶梯：`ok`（30 天内未到期）、`d30`、`d15`、`d7`、`d1`，再到 `overdue`。`complianceSchedule` 把本年到期的已登记义务视为权威，并为成立周年日落在本年的客户追加一行推算 NAR1（`source: 'derived'`）——周年日后 `NAR1_FILING_WINDOW_DAYS`（31）天到期——除非该年已登记过 NAR1 义务，因此已登记与推算行不会重复提醒。
+客户与义务写入走同一条 wire 校验：`nameCn`、`incorporationDate`（`YYYY-MM-DD`）、`kind`（`NAR1`/`AB56`/`PTR`/`ITR`）、`periodLabel` 与 `dueDate` 必填，可选字段非空才入库，未知客户 id 以 `workbench/client-not-found` 拒绝；未知义务 id 以 `workbench/obligation-not-found` 拒绝。`daysUntilDue` 与 `dueTier` 依据当天 UTC 日期派生，`dueTier` 划出催办档位所依据的提醒阶梯：`ok`（30 天内未到期）、`d30`、`d15`、`d7`、`d1`，再到 `overdue`。`complianceSchedule` 把本年到期的已登记义务视为权威，并为成立周年日落在本年的客户追加一行推算 NAR1（`source: 'derived'`）——周年日后 `NAR1_FILING_WINDOW_DAYS`（31）天到期——除非该年已登记过 NAR1 义务，因此已登记与推算行不会重复提醒。
 
 签转写入走同一条校验：`clientId` 与 `title`（1–`MAX_DELIVERY_TITLE_LENGTH`（120）字符）必填，`channel` 缺省为 `email`（`email`/`wechat`/`whatsapp`），未知客户 id 以 `workbench/client-not-found` 拒绝；未知签转 id 以 `workbench/delivery-not-found` 拒绝。`daysSinceSent` 按发出日期（UTC）计整天数，`followUpTier` 划出催办工作流依据的阶梯：第一级之前为 `fresh`，未查看自 `DELIVERY_NUDGE_DAYS`（3）起为 `nudge`，未签署自 `DELIVERY_CHASE_DAYS`（7）起为 `chase`，自 `DELIVERY_ESCALATE_DAYS`（14）起为 `escalate`，行关闭（`signed`/`returned`）后为 `done`。
 

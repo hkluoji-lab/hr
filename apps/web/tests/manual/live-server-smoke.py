@@ -109,10 +109,10 @@ def main():
                f"credits={c} team={t} progress={g} deliverables={d}")
 
         # ---- 5. sidebar entries ----
-        nav_names = ["任务大厅", "智能任务助手", "活跃任务", "客户与申报", "AI 团队", "项目", "成员管理"]
+        nav_names = ["任务大厅", "智能任务助手", "活跃任务", "AI 团队", "项目", "成员管理"]
         body = page.inner_text("body")
         missing = [n for n in nav_names if n not in body]
-        record("侧边栏七个入口", not missing, "缺:" + ",".join(missing) if missing else "全部存在")
+        record("侧边栏六个入口", not missing, "缺:" + ",".join(missing) if missing else "全部存在")
 
         # ---- 6. pages ----
         open_nav("任务大厅")
@@ -129,19 +129,9 @@ def main():
         record("活跃任务页", "正在运行的任务" in body or "当前没有运行中的任务" in body,
                body[:60].replace(chr(10), " "))
 
-        open_nav("客户与申报")
-        body = page.inner_text("body")
-        checks = {
-            "申报日程": "申报" in body,
-            "客户主档": "客户" in body,
-            "文件签转": ("签转" in body or "催办" in body),
-        }
-        record("客户与申报页各分区", all(checks.values()),
-               "; ".join(f"{k}={v}" for k, v in checks.items()))
-
         open_nav("AI 团队")
         body = page.inner_text("body")
-        record("AI 团队页角色卡", "秘书" in body and "会计" in body and "法务" in body and "审计" in body,
+        record("AI 团队页角色卡", "行政" in body and "财务" in body and "法务" in body and "融资" in body,
                body[:60].replace(chr(10), " "))
 
         # 项目 opens the workspace browser in the sidebar (no overlay page)

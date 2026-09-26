@@ -1,12 +1,12 @@
 /**
  * The workbench page surface: one `shell.overlay` entry rendering whichever
  * page the sidebar nav opened — the task hall, the task assistant, the active
- * tasks, the secretary-company clients page, the AI team, the month report, or
- * the owner's member management — beside the frame's sidebar, which stays
- * visible and clickable (the 3088 conversation work mode). Closed state renders
- * null, so the overlay layer stays click-through until a page is open. Escape
- * and the header's close control both dismiss. The members page renders only
- * for the deployment owner.
+ * tasks, the AI team, the month report, or the owner's member management —
+ * beside the frame's sidebar, which stays visible and clickable (the 3088
+ * conversation work mode). Closed state renders null, so the overlay layer
+ * stays click-through until a page is open. Escape and the header's close
+ * control both dismiss. The members page renders only for the deployment
+ * owner.
  */
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { RefObject } from 'react'
@@ -15,10 +15,6 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
-import type {
-  WorkbenchClientCreate, WorkbenchDeliveryChannel, WorkbenchDeliveryStatus, WorkbenchFollowUpCreate,
-  WorkbenchObligationCreate,
-} from '@deepseek-ai/dsh-workbench/types'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: pulls the ui-layout SlotMap merge (the frame-wide overlay seat).
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -29,14 +25,12 @@ import {
   type InviteOutcome,
   type LedgerState,
   type MembersState,
-  type MutationOutcome,
   type TaskRow,
   type WorkbenchPageId,
   type WorkbenchPagesState,
   type WorkbenchState,
 } from './workbench-store.ts'
 import { AssistantPage } from './pages/AssistantPage.tsx'
-import { ClientsPage } from './pages/ClientsPage.tsx'
 import { MembersPage } from './pages/MembersPage.tsx'
 import { ReportPage } from './pages/ReportPage.tsx'
 import { TaskHallPage } from './pages/TaskHallPage.tsx'
@@ -50,7 +44,6 @@ const TITLES: Record<WorkbenchPageId, WorkbenchKey> = {
   hall: 'nav.hall',
   assistant: 'nav.assistant',
   active: 'nav.active',
-  clients: 'nav.clients',
   team: 'nav.team',
   report: 'nav.report',
   members: 'nav.members',
@@ -61,7 +54,6 @@ const SUBTITLES: Record<WorkbenchPageId, WorkbenchKey> = {
   hall: 'hall.subtitle',
   assistant: 'assistant.subtitle',
   active: 'active.subtitle',
-  clients: 'clients.subtitle',
   team: 'team.subtitle',
   report: 'report.subtitle',
   members: 'members.subtitle',
@@ -78,7 +70,7 @@ export interface WorkbenchShellInjected {
     ledger: SnapshotStore<LedgerState>
     /** Member-roster snapshot bound by the renderer as useMembers. */
     members: SnapshotStore<MembersState>
-    /** Clients-page snapshot bound by the renderer as useClients. */
+    /** Client-data snapshot bound by the renderer as useClients. */
     clients: SnapshotStore<ClientsState>
   }
   /** Hall rows folded from the Session list; stable between list updates. */
@@ -89,28 +81,8 @@ export interface WorkbenchShellInjected {
   loadLedger: () => Promise<void>
   /** Read the member roster. */
   loadMembers: () => Promise<void>
-  /** Read the client master, the obligation ledger, and the schedule. */
+  /** Read the client data the team page folds into each role's pending line. */
   loadClients: () => Promise<void>
-  /** Create one client master row. */
-  addClient: (payload: WorkbenchClientCreate) => Promise<MutationOutcome>
-  /** Remove one client master row; its obligations go with it. */
-  removeClient: (id: string) => Promise<MutationOutcome>
-  /** Record one filing obligation against a client. */
-  addObligation: (payload: WorkbenchObligationCreate) => Promise<MutationOutcome>
-  /** Move one obligation between `open` and `submitted`. */
-  markObligation: (id: string, status: 'open' | 'submitted') => Promise<MutationOutcome>
-  /** Remove one obligation row. */
-  removeObligation: (id: string) => Promise<MutationOutcome>
-  /** Record one signature delivery against a client. */
-  addDelivery: (payload: { clientId: string; title: string; channel: WorkbenchDeliveryChannel }) => Promise<MutationOutcome>
-  /** Move one delivery along its lifecycle. */
-  markDelivery: (id: string, status: WorkbenchDeliveryStatus) => Promise<MutationOutcome>
-  /** Remove one delivery row. */
-  removeDelivery: (id: string) => Promise<MutationOutcome>
-  /** Log one follow-up reminder against an open delivery or obligation. */
-  recordFollowUp: (payload: WorkbenchFollowUpCreate) => Promise<MutationOutcome>
-  /** Switch the monthly report's month and re-read the page. */
-  setReportMonth: (month: string) => Promise<void>
   /** Close the open page. */
   close: () => void
   /** Start a fresh default-composition task and leave the page. */
@@ -217,9 +189,7 @@ function useSidebarOffset(open: WorkbenchPageId | null): { rootRef: RefObject<HT
 export function WorkbenchShell({
   usePages, useWorkbench, useLedger, useMembers, useClients, useTasks,
   load, loadLedger, loadMembers, loadClients, close, startTask, openSession, startWithPreset, assignTask,
-  grantCredits, createInvite, unbindMember, assignMember, deleteAccount,
-  addClient, removeClient, addObligation, markObligation, removeObligation,
-  addDelivery, markDelivery, removeDelivery, recordFollowUp, setReportMonth, t,
+  grantCredits, createInvite, unbindMember, assignMember, deleteAccount, t,
 }: WorkbenchShellProps) {
   const open = usePages(snapshot => snapshot.open)
   const team = useWorkbench(snapshot => snapshot)
@@ -234,7 +204,7 @@ export function WorkbenchShell({
     void load()
     if (open === 'report') void loadLedger()
     if (open === 'members') void loadMembers()
-    if (open === 'clients' || open === 'team') void loadClients()
+    if (open === 'team') void loadClients()
   }, [open, load, loadLedger, loadMembers, loadClients])
 
   useEffect(() => {
@@ -291,22 +261,6 @@ export function WorkbenchShell({
         )}
         {open === 'assistant' && (
           <AssistantPage state={team} onAssign={assignTask} t={t} />
-        )}
-        {open === 'clients' && (
-          <ClientsPage
-            clients={clientsPage}
-            onAddClient={addClient}
-            onRemoveClient={removeClient}
-            onAddObligation={addObligation}
-            onMarkObligation={markObligation}
-            onRemoveObligation={removeObligation}
-            onAddDelivery={addDelivery}
-            onMarkDelivery={markDelivery}
-            onRemoveDelivery={removeDelivery}
-            onRecordFollowUp={recordFollowUp}
-            onSetReportMonth={setReportMonth}
-            t={t}
-          />
         )}
         {open === 'team' && (
           <TeamPage state={team} clients={clientsPage} onStart={startWithPreset} onAction={assignTask} t={t} />

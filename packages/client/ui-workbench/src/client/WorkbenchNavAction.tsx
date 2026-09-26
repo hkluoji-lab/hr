@@ -19,7 +19,6 @@ import {
   IconAgentPresetOutline16,
   IconChevronDownOutline14,
   IconChevronRightOutline14,
-  IconDataOutline16,
   IconFolderClose16,
   IconListPenOutline16,
   IconPlayOutline16,
@@ -37,7 +36,7 @@ import { NS, type WorkbenchKey } from './locales.ts'
 import css from './WorkbenchNavAction.module.css'
 
 /** A surface a sidebar navigation entry activates. */
-export type WorkbenchNavTarget = 'hall' | 'assistant' | 'active' | 'clients' | 'team' | 'projects' | 'members'
+export type WorkbenchNavTarget = 'hall' | 'assistant' | 'active' | 'team' | 'projects' | 'members'
 
 /** Glyph, label, and the page each nav target drives (null = command). */
 const TARGETS: Record<WorkbenchNavTarget, {
@@ -48,7 +47,6 @@ const TARGETS: Record<WorkbenchNavTarget, {
   hall: { icon: IconListPenOutline16, label: 'nav.hall', page: 'hall' },
   assistant: { icon: IconSparkle16, label: 'nav.assistant', page: 'assistant' },
   active: { icon: IconPlayOutline16, label: 'nav.active', page: 'active' },
-  clients: { icon: IconDataOutline16, label: 'nav.clients', page: 'clients' },
   team: { icon: IconAgentPresetOutline16, label: 'nav.team', page: 'team' },
   projects: { icon: IconFolderClose16, label: 'nav.projects', page: null },
   members: { icon: IconUserOutline16, label: 'nav.members', page: 'members' },

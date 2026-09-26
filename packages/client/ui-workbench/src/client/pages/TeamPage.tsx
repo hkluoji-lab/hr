@@ -2,7 +2,7 @@
  * The AI team page: the company-role roster as workbench cards, at page scale —
  * the same `roleMembers` fold the hero dashboard presents, so mode and other
  * non-role presets never appear as the company's team. Each role card carries
- * the business the role must act on next (folded from the clients page's data,
+ * the business the role must act on next (folded from the clients snapshot,
  * hidden until that read is ready) and the preset one-click actions that start
  * a session with the action's brief; the card head still starts a plain
  * session for that member. Broken presets stay disabled throughout.
@@ -20,7 +20,7 @@ import css from './WorkbenchPages.module.css'
 export interface TeamPageProps {
   /** Roster snapshot shared with the hero dashboard. */
   state: WorkbenchState
-  /** Clients-page snapshot folded into each role's pending summary. */
+  /** Clients snapshot folded into each role's pending summary. */
   clients: ClientsState
   /** Start a session composed for one member's preset. */
   onStart: (id: string) => void

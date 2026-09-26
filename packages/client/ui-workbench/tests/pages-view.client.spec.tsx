@@ -3,25 +3,23 @@
  * The workbench page surface: the hall's rows, the active-tasks filter, the
  * task assistant's brief form, the team grid, the report's
  * metrics/ledger/grant form, the owner's member management (invites, roster,
- * unbind, account deletion), the secretary-company clients page (schedule,
- * master, filing ledger), and the shell that hosts them — closed state,
+ * unbind, account deletion), and the shell that hosts them — closed state,
  * Escape/close dismissal, and the reads an open page triggers.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import type { AccountEntry, MemberListEntry } from '@deepseek-ai/dsh-web-login/shared'
 import {
   WorkbenchShell, createTaskRowsHook, type WorkbenchShellProps,
 } from '../src/client/WorkbenchShell.tsx'
 import { AssistantPage, type AssistantPageProps } from '../src/client/pages/AssistantPage.tsx'
-import { ClientsPage, type ClientsPageProps } from '../src/client/pages/ClientsPage.tsx'
 import { MembersPage, type MembersPageProps } from '../src/client/pages/MembersPage.tsx'
 import { TaskHallPage, type TaskHallPageProps } from '../src/client/pages/TaskHallPage.tsx'
 import { TeamPage } from '../src/client/pages/TeamPage.tsx'
 import { ReportPage, type ReportPageProps } from '../src/client/pages/ReportPage.tsx'
 import type {
-  ClientsState, InviteOutcome, LedgerState, MembersState, MutationOutcome, TaskRow, TeamMember,
+  ClientsState, InviteOutcome, LedgerState, MembersState, TaskRow, TeamMember,
   WorkbenchPagesState, WorkbenchState,
 } from '../src/client/workbench-store.ts'
 import { ROLES } from '../src/client/roles.ts'
@@ -607,346 +605,6 @@ describe('MembersPage', () => {
   })
 })
 
-describe('ClientsPage', () => {
-  const CLIENT = {
-    id: 'C-2026-0001', nameCn: 'ABC 贸易有限公司', nameEn: 'ABC Trading Limited',
-    brNo: 'BR-7788', incorporationDate: '2024-03-15', complianceStatus: 'green' as const,
-    createdAt: 1, openObligations: 1, openDeliveries: 1,
-  }
-  const OBLIGATION = {
-    id: 'o1', clientId: 'C-2026-0001', clientNameCn: 'ABC 贸易有限公司', kind: 'NAR1' as const,
-    periodLabel: '2026', dueDate: '2026-03-15', status: 'open' as const, createdAt: 1,
-    daysUntilDue: 30, dueTier: 'd30' as const,
-  }
-  const DELIVERY = {
-    id: 'd1', clientId: 'C-2026-0001', clientNameCn: 'ABC 贸易有限公司', title: '2026 年报 NAR1 套装',
-    channel: 'email' as const, status: 'sent' as const, createdAt: 1, daysSinceSent: 7, followUpTier: 'chase' as const,
-  }
-  const FOLLOW_UP = {
-    id: 'delivery:d1', targetKind: 'delivery' as const, targetId: 'd1', clientId: 'C-2026-0001',
-    clientNameCn: 'ABC 贸易有限公司', title: '2026 年报 NAR1 套装', tier: 'chase' as const,
-    suggestedChannel: 'wechat' as const, days: 7, message: '催办话术草稿', reminderCount: 1, lastReminderAt: 2,
-  }
-  const CLIENTS: ClientsState = {
-    status: 'ready',
-    error: null,
-    clients: [CLIENT],
-    obligations: [OBLIGATION],
-    schedule: {
-      year: '2026',
-      rows: [
-        { clientId: 'C-2026-0001', clientNameCn: 'ABC 贸易有限公司', kind: 'NAR1', periodLabel: '2026', dueDate: '2026-03-15', status: 'open', source: 'ledger', dueTier: 'd30' },
-        { clientId: 'C-2026-0002', clientNameCn: '乙公司', kind: 'NAR1', periodLabel: '2026', dueDate: '2026-07-01', status: 'open', source: 'derived', dueTier: 'ok' },
-      ],
-    },
-    deliveries: [DELIVERY],
-    followUps: [FOLLOW_UP],
-    reportMonth: '2026-09',
-    report: {
-      month: '2026-09',
-      clients: { total: 2, newInMonth: 1 },
-      obligations: { recordedInMonth: 1, open: 1, overdue: 0 },
-      deliveries: { sent: 1, signed: 0, returned: 0, open: 1 },
-      reminders: {
-        total: 1,
-        byChannel: { email: 1, wechat: 0, whatsapp: 0 },
-        byTier: { nudge: 0, chase: 1, escalate: 0, d30: 0, d15: 0, d7: 0, d1: 0, overdue: 0 },
-      },
-      health: [
-        {
-          clientId: 'C-2026-0001', clientNameCn: 'ABC 贸易有限公司', openFilings: 1, overdueFilings: 0,
-          chasingDeliveries: 1, remindersInMonth: 1, health: 'yellow' as const,
-        },
-        {
-          clientId: 'C-2026-0002', clientNameCn: '乙公司', openFilings: 0, overdueFilings: 0,
-          chasingDeliveries: 0, remindersInMonth: 0, health: 'green' as const,
-        },
-      ],
-    },
-  }
-
-  function props(over: Partial<ClientsPageProps> = {}): ClientsPageProps {
-    return {
-      clients: CLIENTS,
-      onAddClient: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
-      onRemoveClient: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
-      onAddObligation: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
-      onMarkObligation: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
-      onRemoveObligation: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
-      onAddDelivery: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
-      onMarkDelivery: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
-      onRemoveDelivery: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
-      onRecordFollowUp: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
-      onSetReportMonth: vi.fn((): Promise<void> => Promise.resolve()),
-      t,
-      ...over,
-    }
-  }
-
-  it('renders the schedule with tiers and sources, the master, and the ledger', () => {
-    render(<ClientsPage {...props()} />)
-    expect(screen.getByText(zh['clients.schedule.title'].replace('{year}', '2026'))).toBeTruthy()
-    // The client name and the due tier repeat across the schedule, the master,
-    // and the ledger; assert presence, not uniqueness.
-    expect(screen.getAllByText('ABC 贸易有限公司').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getAllByText(zh['clients.tier.d30']).length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText(zh['clients.tier.ok'])).toBeTruthy()
-    expect(screen.getByText(zh['clients.source.derived'])).toBeTruthy()
-    expect(screen.getByText(zh['clients.source.ledger'])).toBeTruthy()
-    expect(screen.getByText('ABC Trading Limited')).toBeTruthy()
-    // The master row joins BR/CR/incorporation into one meta string.
-    expect(screen.getByText('BR BR-7788 · 成立于 2024-03-15')).toBeTruthy()
-    // The master row and the report's health rows share the green vocabulary.
-    expect(screen.getAllByText(zh['clients.compliance.green']).length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText(`${zh['clients.master.openObligations'].replace('{n}', '1')} · ${zh['clients.master.openDeliveries'].replace('{n}', '1')}`)).toBeTruthy()
-    expect(screen.getByText(zh['clients.obligationStatus.open'])).toBeTruthy()
-  })
-
-  it('notes loading, error, and empty reads', () => {
-    const loading = render(<ClientsPage {...props({ clients: { ...CLIENTS, status: 'loading', schedule: null } })} />)
-    // The loading note renders in both the schedule and the master sections.
-    expect(screen.getAllByText(zh['clients.read.loading']).length).toBeGreaterThanOrEqual(1)
-    loading.unmount()
-
-    const failed = render(<ClientsPage {...props({
-      clients: {
-        status: 'error', error: 'boom', clients: [], obligations: [], schedule: null, deliveries: [],
-        followUps: [], reportMonth: '2026-09', report: null,
-      },
-    })} />)
-    expect(screen.getAllByText(zh['clients.read.error'].replace('{message}', 'boom')).length)
-      .toBeGreaterThanOrEqual(1)
-    failed.unmount()
-
-    render(<ClientsPage {...props({
-      clients: {
-        status: 'ready', error: null, clients: [], obligations: [], schedule: { year: '2026', rows: [] },
-        deliveries: [], followUps: [], reportMonth: '2026-09', report: null,
-      },
-    })} />)
-    expect(screen.getByText(zh['clients.master.empty'])).toBeTruthy()
-    expect(screen.getByText(zh['clients.schedule.empty'])).toBeTruthy()
-    expect(screen.getByText(zh['clients.obligations.empty'])).toBeTruthy()
-    expect(screen.getByText(zh['clients.delivery.empty'])).toBeTruthy()
-    expect(screen.getByText(zh['clients.followUpCenter.empty'])).toBeTruthy()
-    expect(screen.getByText(zh['clients.report.empty'])).toBeTruthy()
-  })
-
-  it('renders the monthly report with the picker, the metrics, and the per-client health', () => {
-    render(<ClientsPage {...props()} />)
-    const section = screen.getByText(zh['clients.report.title']).closest('section')!
-
-    const month = within(section).getByLabelText(zh['clients.report.month']) as HTMLInputElement
-    expect(month.value).toBe('2026-09')
-
-    expect(within(section).getByText(zh['clients.report.metrics.clients.total'])).toBeTruthy()
-    expect(within(section).getByText(zh['clients.report.metrics.obligations.overdue'])).toBeTruthy()
-    expect(within(section).getByText(zh['clients.report.metrics.reminders.total'])).toBeTruthy()
-    expect(within(section).getAllByText(zh['clients.report.health.openFilings'].replace('{n}', '1'))).toBeTruthy()
-    expect(within(section).getByText(zh['clients.compliance.yellow'])).toBeTruthy()
-    // The master row's green badge shares the vocabulary, so match any count.
-    expect(within(section).getAllByText(zh['clients.compliance.green']).length).toBeGreaterThanOrEqual(1)
-    expect(within(section).getByText(zh['clients.report.health.reminders'].replace('{n}', '1'))).toBeTruthy()
-  })
-
-  it('switches the report month from the picker', async () => {
-    const onSetReportMonth = vi.fn((): Promise<void> => Promise.resolve())
-    render(<ClientsPage {...props({ onSetReportMonth })} />)
-    fireEvent.change(screen.getByLabelText(zh['clients.report.month']), { target: { value: '2026-08' } })
-    await vi.waitFor(() => { expect(onSetReportMonth).toHaveBeenCalledWith('2026-08') })
-  })
-
-  it('notes an empty health fold when the report has no clients', () => {
-    render(<ClientsPage {...props({
-      clients: { ...CLIENTS, report: { ...CLIENTS.report!, health: [] } },
-    })} />)
-    expect(screen.getByText(zh['clients.report.health.empty'])).toBeTruthy()
-  })
-
-  it('adds a client with only the filled optional fields and clears the form', async () => {
-    const onAddClient = vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true }))
-    render(<ClientsPage {...props({ onAddClient })} />)
-    const submit = screen.getByRole('button', { name: zh['clients.add.submit'] })
-    expect(submit.hasAttribute('disabled')).toBe(true)
-
-    fireEvent.change(screen.getByLabelText(zh['clients.add.nameCn']), { target: { value: '  甲公司  ' } })
-    fireEvent.change(screen.getByLabelText(zh['clients.add.incorporation']), { target: { value: '2024-03-15' } })
-    fireEvent.change(screen.getByLabelText(zh['clients.add.brNo']), { target: { value: 'BR-9' } })
-    fireEvent.click(submit)
-
-    await vi.waitFor(() => {
-      expect(onAddClient).toHaveBeenCalledWith({
-        nameCn: '甲公司', brNo: 'BR-9', incorporationDate: '2024-03-15',
-      })
-    })
-    await waitFor(() => {
-      const nameInput = screen.getByLabelText(zh['clients.add.nameCn']) as HTMLInputElement
-      expect(nameInput.value).toBe('')
-    })
-  })
-
-  it('disables the submit until the name and date are present, and surfaces the host refusal', async () => {
-    const onAddClient = vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: false, code: null, error: 'nope' }))
-    render(<ClientsPage {...props({ onAddClient })} />)
-    const submit = screen.getByRole('button', { name: zh['clients.add.submit'] })
-
-    // Missing date keeps the control disabled, so a click cannot submit.
-    fireEvent.change(screen.getByLabelText(zh['clients.add.nameCn']), { target: { value: '甲公司' } })
-    expect(submit.hasAttribute('disabled')).toBe(true)
-    fireEvent.click(submit)
-    expect(onAddClient).not.toHaveBeenCalled()
-
-    fireEvent.change(screen.getByLabelText(zh['clients.add.incorporation']), { target: { value: '2024-03-15' } })
-    fireEvent.click(submit)
-    await vi.waitFor(() => {
-      expect(screen.getByRole('alert').textContent)
-        .toBe(zh['clients.add.failed'].replace('{message}', 'nope'))
-    })
-  })
-
-  it('removes a client and marks or removes an obligation row', async () => {
-    const onRemoveClient = vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true }))
-    const onMarkObligation = vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true }))
-    const onRemoveObligation = vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true }))
-    render(<ClientsPage {...props({ onRemoveClient, onMarkObligation, onRemoveObligation })} />)
-
-    // Both remove buttons read 删除; scope each query to its row. The master
-    // row is the green-badged row inside the master section — the report's
-    // health rows share the vocabulary, so scope by section first.
-    const masterSection = screen.getByText(zh['clients.master.title']).closest('section')!
-    const masterRow = within(masterSection).getByText(zh['clients.compliance.green']).closest('li')!
-    fireEvent.click(within(masterRow).getByRole('button', { name: zh['clients.master.remove'] }))
-    await vi.waitFor(() => { expect(onRemoveClient).toHaveBeenCalledWith('C-2026-0001') })
-
-    const ledgerRow = screen.getByText(zh['clients.obligationStatus.open']).closest('li')!
-    fireEvent.click(within(ledgerRow).getByRole('button', { name: zh['clients.obligations.mark'] }))
-    await vi.waitFor(() => { expect(onMarkObligation).toHaveBeenCalledWith('o1', 'submitted') })
-
-    fireEvent.click(within(ledgerRow).getByRole('button', { name: zh['clients.obligations.remove'] }))
-    await vi.waitFor(() => { expect(onRemoveObligation).toHaveBeenCalledWith('o1') })
-  })
-
-  it('records a filing against the chosen client and refuses an incomplete form locally', async () => {
-    const onAddObligation = vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true }))
-    render(<ClientsPage {...props({ onAddObligation })} />)
-    // The client label reads 客户 in both the obligation and the delivery form;
-    // scope every query to the obligation section.
-    const section = screen.getByText(zh['clients.obligations.title']).closest('section')!
-    const submit = within(section).getByRole('button', { name: zh['clients.obligations.record.submit'] })
-    expect(submit.hasAttribute('disabled')).toBe(true)
-
-    fireEvent.change(within(section).getByLabelText(zh['clients.obligations.record.client']), { target: { value: 'C-2026-0001' } })
-    fireEvent.change(within(section).getByLabelText(zh['clients.obligations.record.kind']), { target: { value: 'ITR' } })
-    fireEvent.change(within(section).getByLabelText(zh['clients.obligations.record.period']), { target: { value: '2026' } })
-    fireEvent.click(submit)
-    expect(onAddObligation).not.toHaveBeenCalled()
-
-    fireEvent.change(within(section).getByLabelText(zh['clients.obligations.record.due']), { target: { value: '2026-04-30' } })
-    fireEvent.click(submit)
-    await vi.waitFor(() => {
-      expect(onAddObligation).toHaveBeenCalledWith({
-        clientId: 'C-2026-0001', kind: 'ITR', periodLabel: '2026', dueDate: '2026-04-30',
-      })
-    })
-  })
-
-  it('renders the delivery ledger with channel, lifecycle, and follow-up tiers', () => {
-    render(<ClientsPage {...props()} />)
-    expect(screen.getByText(zh['clients.delivery.title'])).toBeTruthy()
-    expect(screen.getByText(zh['clients.deliveryStatus.sent'])).toBeTruthy()
-    // The days meta and the tier badge also render in the follow-up center's
-    // row; assert presence, not uniqueness.
-    expect(screen.getAllByText(zh['clients.delivery.days'].replace('{n}', '7')).length).toBeGreaterThanOrEqual(1)
-    expect(screen.getAllByText(zh['clients.followUp.chase']).length).toBeGreaterThanOrEqual(1)
-    // The channel badge and the form's channel option share the label text.
-    expect(screen.getAllByText(zh['clients.channel.email']).length).toBeGreaterThanOrEqual(1)
-  })
-
-  it('records a delivery against the chosen client and refuses an incomplete form locally', async () => {
-    const onAddDelivery = vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true }))
-    render(<ClientsPage {...props({ onAddDelivery })} />)
-    // The client label reads 客户 in both the obligation and the delivery form;
-    // scope every query to the delivery section.
-    const section = screen.getByText(zh['clients.delivery.title']).closest('section')!
-    const submit = within(section).getByRole('button', { name: zh['clients.delivery.record.submit'] })
-    expect(submit.hasAttribute('disabled')).toBe(true)
-
-    fireEvent.change(within(section).getByLabelText(zh['clients.delivery.record.client']), { target: { value: 'C-2026-0001' } })
-    fireEvent.click(submit)
-    expect(onAddDelivery).not.toHaveBeenCalled()
-
-    fireEvent.change(within(section).getByLabelText(zh['clients.delivery.record.title']), { target: { value: '  年报套装  ' } })
-    fireEvent.change(within(section).getByLabelText(zh['clients.delivery.record.channel']), { target: { value: 'wechat' } })
-    fireEvent.click(submit)
-    await vi.waitFor(() => {
-      expect(onAddDelivery).toHaveBeenCalledWith({ clientId: 'C-2026-0001', title: '年报套装', channel: 'wechat' })
-    })
-  })
-
-  it('advances and removes a delivery row through its lifecycle', async () => {
-    const onMarkDelivery = vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true }))
-    const onRemoveDelivery = vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true }))
-    render(<ClientsPage {...props({ onMarkDelivery, onRemoveDelivery })} />)
-
-    // The tier badge repeats in the follow-up center; scope to the delivery ledger.
-    const section = screen.getByText(zh['clients.delivery.title']).closest('section')!
-    const deliveryRow = within(section).getByText(zh['clients.followUp.chase']).closest('li')!
-    fireEvent.click(within(deliveryRow).getByRole('button', { name: zh['clients.delivery.advance.viewed'] }))
-    await vi.waitFor(() => { expect(onMarkDelivery).toHaveBeenCalledWith('d1', 'viewed') })
-
-    fireEvent.click(within(deliveryRow).getByRole('button', { name: zh['clients.delivery.remove'] }))
-    await vi.waitFor(() => { expect(onRemoveDelivery).toHaveBeenCalledWith('d1') })
-  })
-
-  it('renders the follow-up center queue with the rung badge, kind, days, and reminder count', () => {
-    render(<ClientsPage {...props()} />)
-    expect(screen.getByText(zh['clients.followUpCenter.title'])).toBeTruthy()
-    const center = screen.getByText(zh['clients.followUpCenter.title']).closest('section')!
-    const queueRow = within(center).getByText(zh['clients.followUp.chase']).closest('li')!
-    expect(within(queueRow).getByText(zh['clients.followUpCenter.kind.delivery'])).toBeTruthy()
-    expect(within(queueRow).getByText(zh['clients.delivery.days'].replace('{n}', '7'))).toBeTruthy()
-    expect(within(queueRow).getByText(zh['clients.followUpCenter.reminders'].replace('{n}', '1'))).toBeTruthy()
-    const message = within(queueRow).getByLabelText(zh['clients.followUpCenter.message']) as HTMLTextAreaElement
-    expect(message.value).toBe('催办话术草稿')
-  })
-
-  it('logs a reminder with the edited message and channel from the queue row', async () => {
-    const onRecordFollowUp = vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true }))
-    render(<ClientsPage {...props({ onRecordFollowUp })} />)
-    const center = screen.getByText(zh['clients.followUpCenter.title']).closest('section')!
-    const queueRow = within(center).getByText(zh['clients.followUp.chase']).closest('li')!
-
-    fireEvent.change(within(queueRow).getByLabelText(zh['clients.followUpCenter.message']), { target: { value: '已电话提醒客户' } })
-    fireEvent.change(within(queueRow).getByLabelText(zh['clients.followUpCenter.channel']), { target: { value: 'whatsapp' } })
-    fireEvent.click(within(queueRow).getByRole('button', { name: zh['clients.followUpCenter.submit'] }))
-
-    await vi.waitFor(() => {
-      expect(onRecordFollowUp).toHaveBeenCalledWith({
-        targetKind: 'delivery', targetId: 'd1', channel: 'whatsapp', message: '已电话提醒客户',
-      })
-    })
-  })
-
-  it('notes an empty queue and surfaces a refused reminder from the row', async () => {
-    const onRecordFollowUp = vi.fn((): Promise<MutationOutcome> => Promise.resolve({
-      ok: false, code: 'workbench/follow-up-not-open', error: 'already closed',
-    }))
-    const { unmount } = render(<ClientsPage {...props({ clients: EMPTY_CLIENTS, onRecordFollowUp })} />)
-    expect(screen.getByText(zh['clients.followUpCenter.empty'])).toBeTruthy()
-    unmount()
-
-    render(<ClientsPage {...props({ onRecordFollowUp })} />)
-    const center = screen.getByText(zh['clients.followUpCenter.title']).closest('section')!
-    const queueRow = within(center).getByText(zh['clients.followUp.chase']).closest('li')!
-    fireEvent.click(within(queueRow).getByRole('button', { name: zh['clients.followUpCenter.submit'] }))
-
-    await vi.waitFor(() => {
-      expect(screen.getByRole('alert').textContent)
-        .toBe(zh['clients.followUpCenter.failed'].replace('{message}', 'already closed'))
-    })
-  })
-})
-
 describe('WorkbenchShell', () => {
   function props(open: WorkbenchPagesState['open'], over: Partial<WorkbenchShellProps> = {}): WorkbenchShellProps {
     const handlers = {
@@ -964,15 +622,6 @@ describe('WorkbenchShell', () => {
       unbindMember: vi.fn((): Promise<string | null> => Promise.resolve(null)),
       assignMember: vi.fn((): Promise<string | null> => Promise.resolve(null)),
       deleteAccount: vi.fn((): Promise<string | null> => Promise.resolve(null)),
-      addClient: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
-      removeClient: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
-      addObligation: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
-      markObligation: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
-      removeObligation: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
-      addDelivery: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
-      markDelivery: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
-      removeDelivery: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
-      recordFollowUp: vi.fn((): Promise<MutationOutcome> => Promise.resolve({ ok: true })),
     }
     return {
       usePages: <S,>(select: (snapshot: WorkbenchPagesState) => S) => select({ open }),
@@ -1000,14 +649,6 @@ describe('WorkbenchShell', () => {
     expect(screen.getByRole('heading', { name: zh['nav.report'] })).toBeTruthy()
     await vi.waitFor(() => { expect(loadLedger).toHaveBeenCalledTimes(1) })
     expect(load).toHaveBeenCalledTimes(1)
-  })
-
-  it('opens the clients page, reads its data once, and renders the schedule', async () => {
-    const loadClients = vi.fn(() => Promise.resolve())
-    render(<WorkbenchShell {...props('clients', { loadClients })} />)
-    expect(screen.getByRole('heading', { name: zh['nav.clients'] })).toBeTruthy()
-    expect(screen.getByText(zh['clients.schedule.empty'])).toBeTruthy()
-    await vi.waitFor(() => { expect(loadClients).toHaveBeenCalledTimes(1) })
   })
 
   it('dismisses on the close control and on Escape', () => {

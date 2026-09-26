@@ -14,10 +14,11 @@
  *
  * Beyond the hero, the same controller owns which workbench page covers the
  * frame (the sidebar nav toggles one), the bounded credits ledger the report
- * page reads, the owner's members-management data, and the secretary-company
- * client master with its statutory-filing ledger, the current year's
- * compliance schedule, the signature-delivery ledger, the follow-up center,
- * and the business monthly report (the clients page).
+ * page reads, the owner's members-management data, and the clients read whose
+ * snapshot the AI team page folds into each role's pending line: the
+ * secretary-company client master with its statutory-filing ledger, the current
+ * year's compliance schedule, the signature-delivery ledger, the follow-up
+ * center, and the business monthly report.
  *
  * The logged-in caller's role binding arrives through one same-origin
  * `/auth/status` read (the host login surface's wire contract): owners and
@@ -39,9 +40,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { AgentPresetRoster } from '@deepseek-ai/dsh-agent-presets/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {
-  WorkbenchClient, WorkbenchClientCreate, WorkbenchCreditEntry, WorkbenchDelivery,
-  WorkbenchDeliveryCreate, WorkbenchDeliveryStatus, WorkbenchFollowUp, WorkbenchFollowUpCreate,
-  WorkbenchMonthlyReport, WorkbenchObligation, WorkbenchObligationCreate, WorkbenchSchedule,
+  WorkbenchClient, WorkbenchCreditEntry, WorkbenchDelivery,
+  WorkbenchFollowUp, WorkbenchMonthlyReport, WorkbenchObligation, WorkbenchSchedule,
 } from '@deepseek-ai/dsh-workbench/types'
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 // Wire contract of the host login surface: same-origin routes and payloads.
@@ -159,7 +159,7 @@ export function roleMembers(members: readonly TeamMember[]): readonly TeamMember
   return roles.length > 0 ? roles : members
 }
 
-/** What one company role must act on next, folded from the clients-page data. */
+/** What one company role must act on next, folded from the clients snapshot. */
 export interface RolePending {
   /** Actionable rows the role should work next. */
   count: number
@@ -168,14 +168,14 @@ export interface RolePending {
 }
 
 /**
- * Fold the clients-page data into what one company role must act on next:
+ * Fold the clients snapshot into what one company role must act on next:
  * the admin chases the follow-up center's open rows, finance files open
  * obligations, and the legal side watches the obligations closing in. The
  * recruiting, fundraising, and marketing roles have no client-backed backlog,
  * so they read null and the team page omits the line; a snapshot that is not
  * ready (or a deployment without the workbench service) reads zero, so the
  * team page gates the pending line on the read being ready.
- * @param clients - the clients-page snapshot.
+ * @param clients - the clients snapshot.
  * @param roleId - the company role.
  * @returns the pending count and its label key, or null when the role owns no
  *   clients-data backlog.
@@ -242,7 +242,7 @@ const INITIAL: WorkbenchState = {
 }
 
 /** A workbench page the sidebar surfaces as a frame-wide overlay. */
-export type WorkbenchPageId = 'hall' | 'assistant' | 'active' | 'clients' | 'team' | 'report' | 'members'
+export type WorkbenchPageId = 'hall' | 'assistant' | 'active' | 'team' | 'report' | 'members'
 
 /** Which workbench page, if any, covers the app frame. */
 export interface WorkbenchPagesState {
@@ -296,14 +296,15 @@ export interface MembersState {
 const MEMBERS_INITIAL: MembersState = { status: 'idle', error: null, owner: '', members: [], accounts: [] }
 
 /**
- * The clients-page read lifecycle: the client master (S-CORE-01), the filing
+ * The clients-read lifecycle: the client master (S-CORE-01), the filing
  * obligation ledger (S-COMPL-01), the current year's compliance schedule, the
  * signature-delivery ledger (S-DELIV-01), the follow-up center (S-FOLLOW-01),
  * and the business monthly report (S-RPT-01) for the selected month, all
- * served by the host workbench Remote.
+ * served by the host workbench Remote. The team page folds this snapshot into
+ * each role's pending line; nothing else renders it.
  */
 export interface ClientsState {
-  /** Read lifecycle of the clients page. */
+  /** Read lifecycle of the clients snapshot. */
   status: 'idle' | 'loading' | 'ready' | 'error'
   /** The read failure message, cleared on the next successful read. */
   error: string | null
@@ -334,15 +335,6 @@ const CLIENTS_INITIAL: ClientsState = {
   status: 'idle', error: null, clients: [], obligations: [], schedule: null, deliveries: [], followUps: [],
   reportMonth: currentUtcMonth(), report: null,
 }
-
-/**
- * One host mutation's outcome for the clients page: failures carry the wire
- * error code (the page maps known codes to friendly copy) beside the raw
- * message.
- */
-export type MutationOutcome =
-  | { ok: true }
-  | { ok: false; code: string | null; error: string }
 
 /** One invite-creation outcome for the owner's management page. */
 export type InviteOutcome =
@@ -763,9 +755,8 @@ export class WorkbenchController {
   /**
    * Read the client master, the obligation ledger, the current year's
    * schedule, the delivery ledger, the follow-up center, and the monthly
-   * business report into the clients-page snapshot. Every write below re-reads
-   * the same sextuple, so the page never derives what the host already decided
-   * and the report section stays fresh after every mutation.
+   * business report into the clients snapshot, which the team page folds into
+   * each role's pending line.
    */
   async loadClients(): Promise<void> {
     const keep = this.clients.getSnapshot()
@@ -798,130 +789,6 @@ export class WorkbenchController {
       reportMonth: report.value.month,
       report: report.value,
     })
-  }
-
-  /**
-   * Switch the report section's month and re-read the page, so the report for
-   * the new month comes back from the host rather than being derived here.
-   * @param month - the month to read, `YYYY-MM`.
-   */
-  async setReportMonth(month: string): Promise<void> {
-    this.clients.set({ ...this.clients.getSnapshot(), reportMonth: month })
-    await this.loadClients()
-  }
-
-  /**
-   * Create one client master row, then refresh the page from the host.
-   * @param payload - the creation request.
-   * @returns the mutation outcome; a failure carries the host's error code and message.
-   */
-  async addClient(payload: WorkbenchClientCreate): Promise<MutationOutcome> {
-    const result = await this.ctx.remote.workbench.addClient(payload)
-    if (!result.ok) return { ok: false, code: result.error.code, error: result.error.message }
-    await this.loadClients()
-    return { ok: true }
-  }
-
-  /**
-   * Remove one client master row (its obligations go with it), then refresh.
-   * @param id - the client id to remove.
-   * @returns the mutation outcome; a failure carries the host's error code and message.
-   */
-  async removeClient(id: string): Promise<MutationOutcome> {
-    const result = await this.ctx.remote.workbench.removeClient(id)
-    if (!result.ok) return { ok: false, code: result.error.code, error: result.error.message }
-    await this.loadClients()
-    return { ok: true }
-  }
-
-  /**
-   * Record one filing obligation against a client, then refresh.
-   * @param payload - the recording request.
-   * @returns the mutation outcome; a failure carries the host's error code and message.
-   */
-  async addObligation(payload: WorkbenchObligationCreate): Promise<MutationOutcome> {
-    const result = await this.ctx.remote.workbench.addObligation(payload)
-    if (!result.ok) return { ok: false, code: result.error.code, error: result.error.message }
-    await this.loadClients()
-    return { ok: true }
-  }
-
-  /**
-   * Move one obligation between `open` and `submitted`, then refresh.
-   * @param id - the obligation id.
-   * @param status - the lifecycle state to set.
-   * @returns the mutation outcome; a failure carries the host's error code and message.
-   */
-  async markObligation(id: string, status: 'open' | 'submitted'): Promise<MutationOutcome> {
-    const result = await this.ctx.remote.workbench.markObligation(id, status)
-    if (!result.ok) return { ok: false, code: result.error.code, error: result.error.message }
-    await this.loadClients()
-    return { ok: true }
-  }
-
-  /**
-   * Remove one obligation row, then refresh.
-   * @param id - the obligation id to remove.
-   * @returns the mutation outcome; a failure carries the host's error code and message.
-   */
-  async removeObligation(id: string): Promise<MutationOutcome> {
-    const result = await this.ctx.remote.workbench.removeObligation(id)
-    if (!result.ok) return { ok: false, code: result.error.code, error: result.error.message }
-    await this.loadClients()
-    return { ok: true }
-  }
-
-  /**
-   * Record one signature delivery against a client, then refresh.
-   * @param payload - the recording request.
-   * @returns the mutation outcome; a failure carries the host's error code and message.
-   */
-  async addDelivery(payload: WorkbenchDeliveryCreate): Promise<MutationOutcome> {
-    const result = await this.ctx.remote.workbench.addDelivery(payload)
-    if (!result.ok) return { ok: false, code: result.error.code, error: result.error.message }
-    await this.loadClients()
-    return { ok: true }
-  }
-
-  /**
-   * Move one delivery along its lifecycle (`sent`/`viewed`/`signed`/`returned`),
-   * then refresh.
-   * @param id - the delivery id.
-   * @param status - the lifecycle state to set.
-   * @returns the mutation outcome; a failure carries the host's error code and message.
-   */
-  async markDelivery(id: string, status: WorkbenchDeliveryStatus): Promise<MutationOutcome> {
-    const result = await this.ctx.remote.workbench.markDelivery(id, status)
-    if (!result.ok) return { ok: false, code: result.error.code, error: result.error.message }
-    await this.loadClients()
-    return { ok: true }
-  }
-
-  /**
-   * Remove one delivery row, then refresh.
-   * @param id - the delivery id to remove.
-   * @returns the mutation outcome; a failure carries the host's error code and message.
-   */
-  async removeDelivery(id: string): Promise<MutationOutcome> {
-    const result = await this.ctx.remote.workbench.removeDelivery(id)
-    if (!result.ok) return { ok: false, code: result.error.code, error: result.error.message }
-    await this.loadClients()
-    return { ok: true }
-  }
-
-  /**
-   * Log one follow-up reminder against an open delivery or obligation, then
-   * refresh so the row's reminder count and the queue's rungs come back from
-   * the host rather than being derived here.
-   * @param payload - the logging request; channel and message default to the
-   *   rung's host draft when omitted.
-   * @returns the mutation outcome; a failure carries the host's error code and message.
-   */
-  async recordFollowUp(payload: WorkbenchFollowUpCreate): Promise<MutationOutcome> {
-    const result = await this.ctx.remote.workbench.recordFollowUp(payload)
-    if (!result.ok) return { ok: false, code: result.error.code, error: result.error.message }
-    await this.loadClients()
-    return { ok: true }
   }
 
   /**
