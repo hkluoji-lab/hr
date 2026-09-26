@@ -11,10 +11,12 @@ describe('preset display copy', () => {
     ['ptc', 'presetPtcName', 'presetPtcDescription'],
     ['minimal', 'presetMinimalName', 'presetMinimalDescription'],
     ['cordis', 'presetCordisName', 'presetCordisDescription'],
-    ['secretary', 'presetSecretaryName', 'presetSecretaryDescription'],
-    ['accountant', 'presetAccountantName', 'presetAccountantDescription'],
+    ['recruiting', 'presetRecruitingName', 'presetRecruitingDescription'],
+    ['finance', 'presetFinanceName', 'presetFinanceDescription'],
     ['legal', 'presetLegalName', 'presetLegalDescription'],
-    ['audit', 'presetAuditName', 'presetAuditDescription'],
+    ['financing', 'presetFinancingName', 'presetFinancingDescription'],
+    ['admin', 'presetAdminName', 'presetAdminDescription'],
+    ['marketing', 'presetMarketingName', 'presetMarketingDescription'],
   ] as const)('localizes the shipped %s preset in English and Chinese', (id, nameKey, descriptionKey) => {
     const preset = { id, trust: 'system' as const, name: 'file name', description: 'file description' }
 

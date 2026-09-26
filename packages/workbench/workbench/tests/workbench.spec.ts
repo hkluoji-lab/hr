@@ -877,3 +877,118 @@ describe('workbench follow-up center', () => {
     await reopened.dispose()
   })
 })
+
+describe('workbench monthly report', () => {
+  const BASE = { nameCn: '甲公司', incorporationDate: '2024-03-15' }
+
+  /** The current UTC month, `YYYY-MM`, matching the host default period. */
+  function currentMonth(): string {
+    const now = new Date()
+    const month = String(now.getUTCMonth() + 1).padStart(2, '0')
+    return `${now.getUTCFullYear()}-${month}`
+  }
+
+  const EMPTY_TIERS = { nudge: 0, chase: 0, escalate: 0, d30: 0, d15: 0, d7: 0, d1: 0, overdue: 0 }
+  const EMPTY_CHANNELS = { email: 0, wechat: 0, whatsapp: 0 }
+
+  it('defaults to the current month and reads zeros on an empty deployment', async () => {
+    const { workbench } = await harness()
+    const report = await workbench.remoteMonthlyReport()
+    expect(report.month).toBe(currentMonth())
+    expect(report.clients).toEqual({ total: 0, newInMonth: 0 })
+    expect(report.obligations).toEqual({ recordedInMonth: 0, open: 0, overdue: 0 })
+    expect(report.deliveries).toEqual({ sent: 0, signed: 0, returned: 0, open: 0 })
+    expect(report.reminders).toEqual({ total: 0, byChannel: EMPTY_CHANNELS, byTier: EMPTY_TIERS })
+    expect(report.health).toEqual([])
+  })
+
+  it('counts the current month cohort and splits the delivery lifecycle', async () => {
+    const { workbench } = await harness()
+    const { client } = await workbench.addClient(BASE)
+    await workbench.addObligation({ clientId: client.id, kind: 'PTR', periodLabel: '2025/26', dueDate: isoDaysFromToday(-5) })
+    const signedDelivery = await workbench.addDelivery({ clientId: client.id, title: '文件一' })
+    const returnedDelivery = await workbench.addDelivery({ clientId: client.id, title: '文件二' })
+    await workbench.addDelivery({ clientId: client.id, title: '文件三' })
+    await workbench.markDelivery(signedDelivery.delivery.id, 'signed')
+    await workbench.markDelivery(returnedDelivery.delivery.id, 'returned')
+    await workbench.addObligation({ clientId: client.id, kind: 'NAR1', periodLabel: currentYear(), dueDate: isoDaysFromToday(1) })
+    const { obligations } = await workbench.remoteObligations()
+    const nar1 = obligations.find(row => row.kind === 'NAR1')!
+    await workbench.recordFollowUp({ targetKind: 'obligation', targetId: nar1.id })
+
+    const report = await workbench.remoteMonthlyReport()
+    expect(report.month).toBe(currentMonth())
+    expect(report.clients).toEqual({ total: 1, newInMonth: 1 })
+    expect(report.obligations).toEqual({ recordedInMonth: 2, open: 2, overdue: 1 })
+    expect(report.deliveries).toEqual({ sent: 3, signed: 1, returned: 1, open: 1 })
+    expect(report.reminders.total).toBe(1)
+    expect(report.reminders.byTier).toEqual({ ...EMPTY_TIERS, d1: 1 })
+    expect(report.reminders.byChannel).toEqual({ ...EMPTY_CHANNELS, whatsapp: 1 })
+    expect(report.health).toHaveLength(1)
+    expect(report.health[0]).toMatchObject({
+      clientId: client.id, openFilings: 2, overdueFilings: 1, chasingDeliveries: 0, remindersInMonth: 1, health: 'red',
+    })
+  })
+
+  it('excludes another month rows from the windows but keeps live snapshots and health', async () => {
+    const { workbench } = await harness()
+    const { client } = await workbench.addClient(BASE)
+    await workbench.addObligation({ clientId: client.id, kind: 'PTR', periodLabel: '2025/26', dueDate: isoDaysFromToday(-5) })
+    await workbench.addDelivery({ clientId: client.id, title: '年报套装' })
+
+    const report = await workbench.remoteMonthlyReport('2000-01')
+    expect(report.month).toBe('2000-01')
+    expect(report.clients).toEqual({ total: 1, newInMonth: 0 })
+    expect(report.obligations).toEqual({ recordedInMonth: 0, open: 1, overdue: 1 })
+    expect(report.deliveries).toEqual({ sent: 0, signed: 0, returned: 0, open: 0 })
+    expect(report.reminders.total).toBe(0)
+    expect(report.health).toHaveLength(1)
+  })
+
+  it('derives health worst-first from the two ladders', async () => {
+    const h = await harness()
+    const red = await h.workbench.addClient({ nameCn: '丙公司', incorporationDate: '2024-03-15' })
+    const yellow = await h.workbench.addClient({ nameCn: '乙公司', incorporationDate: '2024-04-20' })
+    await h.workbench.addClient({ nameCn: '甲公司', incorporationDate: '2024-05-25' })
+    await h.workbench.addObligation({ clientId: red.client.id, kind: 'PTR', periodLabel: '2025/26', dueDate: isoDaysFromToday(-5) })
+    await h.workbench.addDelivery({ clientId: yellow.client.id, title: '年报套装' })
+    await h.dispose()
+    await backdateDeliveries(h.root, DELIVERY_NUDGE_DAYS)
+
+    const reopened = await harness({}, { root: h.root })
+    const { health } = await reopened.workbench.remoteMonthlyReport()
+    expect(health.map(row => [row.clientNameCn, row.health])).toEqual([
+      ['丙公司', 'red'],
+      ['乙公司', 'yellow'],
+      ['甲公司', 'green'],
+    ])
+    expect(health[1]!.chasingDeliveries).toBe(1)
+    expect(health[2]!.chasingDeliveries).toBe(0)
+    await reopened.dispose()
+  })
+
+  it('reads an escalated delivery as red and a due-this-week filing as yellow', async () => {
+    const h = await harness()
+    const escalated = await h.workbench.addClient({ nameCn: '甲公司', incorporationDate: '2024-03-15' })
+    const urgent = await h.workbench.addClient({ nameCn: '乙公司', incorporationDate: '2024-03-15' })
+    await h.workbench.addDelivery({ clientId: escalated.client.id, title: '章程修订' })
+    await h.workbench.addObligation({ clientId: urgent.client.id, kind: 'AB56', periodLabel: '2025/26', dueDate: isoDaysFromToday(5) })
+    await h.dispose()
+    await backdateDeliveries(h.root, DELIVERY_ESCALATE_DAYS)
+
+    const reopened = await harness({}, { root: h.root })
+    const { health } = await reopened.workbench.remoteMonthlyReport()
+    expect(health.map(row => [row.clientNameCn, row.health])).toEqual([
+      ['甲公司', 'red'],
+      ['乙公司', 'yellow'],
+    ])
+    await reopened.dispose()
+  })
+
+  it('rejects a malformed month', async () => {
+    const { workbench } = await harness()
+    await expectCode(workbench.remoteMonthlyReport('2026-13'), 'gateway/bad-request')
+    await expectCode(workbench.remoteMonthlyReport('202601'), 'gateway/bad-request')
+    await expectCode(workbench.remoteMonthlyReport('2026-1'), 'gateway/bad-request')
+  })
+})

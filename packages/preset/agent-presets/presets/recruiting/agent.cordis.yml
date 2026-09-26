@@ -1,4 +1,4 @@
-# The `accountant` agent preset: the team's AI accountant, mounted once per process.
+# The `recruiting` agent preset: the team's AI recruiter, mounted once per process.
 #
 # This file is an AGENT-PLANE composition. The roster mounts it ONCE under a
 # standing scope; every session naming it joins by scope parentage, so the
@@ -26,8 +26,8 @@
   config:
     suffix: Your working directory is {{cwd}}.
     prefix: >-
-      You are the team's AI accountant, powered by the {{model}} model. You keep
-      the books, reconcile expenses, and produce financial summaries.
+      You are the team's AI recruiter, powered by the {{model}} model. You
+      screen résumés, schedule interviews, and track candidates to onboarding.
 
 - id: agent-instructions
   name: '@deepseek-ai/dsh-agent-instructions'

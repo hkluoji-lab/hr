@@ -1,6 +1,6 @@
 /* One AI team member card, shared by the hero roster and the team page.
    The compact proportions keep every card one row tall even in a
-   four-across grid: single-line scope, one tag row, no native tooltip. */
+   three-across grid: single-line scope, one tag row, no native tooltip. */
 
 .card {
   position: relative;

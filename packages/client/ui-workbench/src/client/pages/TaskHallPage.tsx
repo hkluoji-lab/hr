@@ -1,9 +1,10 @@
 /**
  * The task hall page: every started session as one row — title, the preset
  * that runs it, its lifecycle, and how long ago it last moved. Clicking a row
- * selects that session and leaves the page.
+ * selects that session and leaves the page; the empty state offers the new-task
+ * start.
  */
-import { StateDot, type StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, StateDot, type StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { timeLabel } from '../time-label.ts'
@@ -21,6 +22,8 @@ export interface TaskHallPageProps {
   now: number
   /** Select one session and leave the hall. */
   onOpen: (id: SessionId) => void
+  /** Start a fresh default-composition task and leave the hall. */
+  onStartTask?: () => void
   /** Empty-state key; the active-tasks page reuses this list for running rows. */
   emptyKey?: WorkbenchKey
   /** Namespace-bound translate. */
@@ -38,11 +41,23 @@ function dotState(status: TaskRow['status']): StateDotState {
 
 /**
  * Render the task hall.
- * @param props - rows, roster, clock, the open action, and the empty-state key.
- * @returns the row list, or the empty note when no task started.
+ * @param props - rows, roster, clock, the open and start actions, and the
+ *   empty-state key.
+ * @returns the row list, or the empty note with its new-task action.
  */
-export function TaskHallPage({ tasks, members, now, onOpen, emptyKey = 'hall.empty', t }: TaskHallPageProps) {
-  if (tasks.length === 0) return <p className={css.empty}>{t(emptyKey)}</p>
+export function TaskHallPage({ tasks, members, now, onOpen, onStartTask, emptyKey = 'hall.empty', t }: TaskHallPageProps) {
+  if (tasks.length === 0) {
+    return (
+      <div className={css.emptyState}>
+        <p className={css.empty}>{t(emptyKey)}</p>
+        {onStartTask !== undefined && (
+          <Button type="button" variant="primary" onClick={onStartTask}>
+            {t('hall.emptyAction')}
+          </Button>
+        )}
+      </div>
+    )
+  }
   const names = new Map(members.map(member => [member.id, member.name]))
   return (
     <ul className={css.taskList}>

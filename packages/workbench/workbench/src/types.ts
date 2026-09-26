@@ -286,6 +286,56 @@ export interface WorkbenchReminderLogged {
   readonly reminder: WorkbenchReminder
 }
 
+/**
+ * One client's live business health as the monthly report folds it (S-RPT-01):
+ * `red` when an open filing sits overdue or a delivery reached the escalation
+ * rung, `yellow` when a delivery is being chased or an open filing falls due
+ * within a week, `green` otherwise. The same vocabulary as the client master's
+ * compliance status, derived live from the ledgers instead of stored.
+ */
+export interface WorkbenchClientHealth {
+  /** Owning client id. */
+  readonly clientId: string
+  /** Client's Chinese name, joined for display. */
+  readonly clientNameCn: string
+  /** Open filing obligations, regardless of due date. */
+  readonly openFilings: number
+  /** Open filings already past their due date. */
+  readonly overdueFilings: number
+  /** Open deliveries that entered the follow-up ladder (T+3 onward). */
+  readonly chasingDeliveries: number
+  /** Reminders logged against this client inside the report month. */
+  readonly remindersInMonth: number
+  /** Derived health state; the vocabulary {@link WorkbenchComplianceStatus} fixes. */
+  readonly health: WorkbenchComplianceStatus
+}
+
+/**
+ * One month's business report (S-RPT-01): the client, filing, delivery, and
+ * reminder tallies inside the month beside the live per-client health fold.
+ * Month-window counts cover records created in the month; `obligations.open`
+ * and `overdue` are current snapshots, and the delivery split is the current
+ * lifecycle of the month's cohort.
+ */
+export interface WorkbenchMonthlyReport {
+  /** The report month, `YYYY-MM`. */
+  readonly month: string
+  /** Client master size beside the rows created in the month. */
+  readonly clients: { readonly total: number; readonly newInMonth: number }
+  /** Obligations recorded in the month beside the current open and overdue counts. */
+  readonly obligations: { readonly recordedInMonth: number; readonly open: number; readonly overdue: number }
+  /** The month's delivery cohort split by its current lifecycle state. */
+  readonly deliveries: { readonly sent: number; readonly signed: number; readonly returned: number; readonly open: number }
+  /** Reminders logged in the month, total and split by channel and ladder rung. */
+  readonly reminders: {
+    readonly total: number
+    readonly byChannel: Readonly<Record<WorkbenchDeliveryChannel, number>>
+    readonly byTier: Readonly<Record<WorkbenchReminderTier, number>>
+  }
+  /** Live per-client health, worst first, name-ordered within one state. */
+  readonly health: readonly WorkbenchClientHealth[]
+}
+
 /** One row of the current-year statutory-filing schedule. */
 export interface WorkbenchScheduleRow {
   /** Owning client id. */

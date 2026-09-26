@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>HR-Starleap AI</title>
+<link rel="manifest" href="./manifest.webmanifest"/>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
+<!-- 下一行由 install.mjs 用原生构建产物 head 里带哈希的 js/css 标签替换 -->
+<!--HRP:NATIVE-ASSETS-->
+<style>
+:root{
+  --blue:#3b82f6; --blue-strong:#2563eb; --blue-bg:#eef4ff;
+  --text:#1f2329; --text-2:#4e5561; --text-3:#8a919f;
+  --border:#e9ebee; --bg:#ffffff; --bg-soft:#fafbfc;
+  --red:#f04438; --rbw:312px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif;
+  color:var(--text); background:var(--bg); overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;border:none;background:none;cursor:pointer;color:inherit}
+
+/* 原生应用（#root）占左区，门户右栏固定在其右侧。transform 让原生 position:fixed
+   浮层以 #root 为包含块，等价于原 iframe 的裁切范围。 */
+#root{position:fixed;left:0;top:0;width:calc(100vw - var(--rbw));height:100vh;overflow:hidden;transform:translateZ(0)}
+body.rb-collapsed #root{width:100vw}
+#rightbar{position:fixed;right:0;top:0;bottom:0;width:var(--rbw);border-left:1px solid var(--border);background:var(--bg-soft);z-index:20;overflow:hidden}
+
+/* ============ 右侧面板 ============ */
+.rb-inner{width:312px;height:100%;overflow-y:auto;padding:16px 16px 24px}
+.rb-inner::-webkit-scrollbar{width:4px}
+.rb-inner::-webkit-scrollbar-thumb{background:#dfe2e7;border-radius:2px}
+.rb-top{display:flex;align-items:center;gap:8px;padding:2px 2px 14px}
+.shop-ico{width:18px;height:18px;flex:none}
+.shop-title{font-size:16px;font-weight:600;color:var(--red)}
+.card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px}
+.card-head{display:flex;align-items:center;width:100%;font-size:15.5px;font-weight:600;color:var(--text)}
+.card-head .chev,.card-head .mini-btn{margin-left:auto;color:var(--text-3)}
+.card-head .mini-btn{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.card-head .mini-btn:hover{background:#f0f2f5;color:var(--text)}
+.card-head .chev{width:16px;height:16px;transition:transform .2s}
+.card.closed .chev{transform:rotate(-180deg)}
+.card.closed .card-body{display:none}
+#card-progress .chev,#card-files .chev{display:none}
+#card-team .chev{margin-left:6px}
+.bonus-num{font-size:32px;font-weight:700;letter-spacing:.5px;margin-top:8px}
+.team-row{display:flex;align-items:center;justify-content:space-between;font-size:14.5px;color:var(--text-2);padding:7px 0}
+.team-row b{color:var(--text);font-weight:600}
+.prog-row{margin-top:12px}
+.prog-row:first-child{margin-top:2px}
+.prog-label{display:flex;justify-content:space-between;font-size:14.5px;color:var(--text);margin-bottom:7px}
+.prog-label span{color:var(--text-2)}
+.track{height:6px;border-radius:3px;background:#e8eaee;overflow:hidden}
+.fill{height:100%;border-radius:3px;background:var(--blue)}
+.file-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;font-size:14.5px;color:var(--text)}
+.file-row:hover .dl{color:var(--blue-strong)}
+.file-row .dl{color:var(--text-3);width:18px;height:18px}
+.file-row .dl:hover{color:var(--blue-strong)}
+
+/* 浮动恢复按钮 */
+.restore{position:fixed;top:16px;width:30px;height:30px;border-radius:9px;background:#fff;border:1px solid var(--border);box-shadow:0 2px 8px rgba(16,24,40,.10);display:none;align-items:center;justify-content:center;color:var(--text-2);z-index:50}
+.restore:hover{color:var(--text)}
+.restore.on{display:flex}
+#rb-restore{right:12px}
+
+/* Toast */
+#toast{position:fixed;left:40%;bottom:110px;transform:translateX(-50%) translateY(8px);background:rgba(28,31,35,.92);color:#fff;font-size:14px;padding:10px 18px;border-radius:10px;opacity:0;pointer-events:none;transition:all .25s;z-index:99;max-width:60vw}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media (max-width:1280px){
+  #rightbar{display:none}
+  #root{width:100vw}
+  #rb-restore{display:none!important}
+}
+</style>
+</head>
+<body>
+
+<!-- 原生 DSH 应用挂载点：与门户同处一个文档，不再使用 iframe -->
+<div id="root"></div>
+
+<!-- ================= 右侧面板 ================= -->
+<aside id="rightbar">
+  <div class="rb-inner">
+    <div class="rb-top">
+      <svg class="shop-ico" viewBox="0 0 24 24" fill="none"><rect x="5.6" y="3.4" width="12.8" height="17.2" rx="1.2" stroke="#f0b429" stroke-width="2.6"/></svg>
+      <span class="shop-title">AI商城</span>
+      <button class="restore-like" id="rb-collapse" title="收起面板" style="margin-left:auto;width:28px;height:28px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;color:var(--text-3)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><line x1="14.5" y1="4.5" x2="14.5" y2="19.5"/></svg>
+      </button>
+    </div>
+
+    <div class="card" id="card-bonus">
+      <button class="card-head">赏金积分<span class="mini-btn" id="bonus-toggle">－</span></button>
+      <div class="card-body"><div class="bonus-num">100,000</div></div>
+    </div>
+
+    <div class="card" id="card-team">
+      <button class="card-head">AI 团队状态
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="card-body">
+        <div class="team-row"><span>online</span><b>4</b></div>
+        <div class="team-row"><span>busy</span><b>1</b></div>
+        <div class="team-row"><span>offline</span><b>1</b></div>
+      </div>
+    </div>
+
+    <div class="card" id="card-progress">
+      <button class="card-head">任务进度
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="card-body">
+        <div class="prog-row"><div class="prog-label"><span>招聘流程</span><span>60%</span></div><div class="track"><div class="fill" style="width:60%"></div></div></div>
+        <div class="prog-row"><div class="prog-label"><span>财务月结</span><span>30%</span></div><div class="track"><div class="fill" style="width:30%"></div></div></div>
+        <div class="prog-row"><div class="prog-label"><span>法务审核</span><span>90%</span></div><div class="track"><div class="fill" style="width:90%"></div></div></div>
+      </div>
+    </div>
+
+    <div class="card" id="card-files">
+      <button class="card-head">任务交付物
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="card-body">
+        <div class="file-row"><span>Q3 绩效方案.docx</span>
+          <button class="dl" data-fn="Q3绩效方案.txt" title="下载">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 10.5 5 5 5-5"/><path d="M4.5 19.5h15"/></svg>
+          </button>
+        </div>
+        <div class="file-row"><span>融资 BP.pdf</span>
+          <button class="dl" data-fn="融资BP.txt" title="下载">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 10.5 5 5 5-5"/><path d="M4.5 19.5h15"/></svg>
+          </button>
+        </div>
+        <div class="file-row"><span>面试题库.xlsx</span>
+          <button class="dl" data-fn="面试题库.txt" title="下载">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 10.5 5 5 5-5"/><path d="M4.5 19.5h15"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<button class="restore" id="rb-restore" title="展开面板">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><line x1="14.5" y1="4.5" x2="14.5" y2="19.5"/></svg>
+</button>
+<div id="toast"></div>
+
+<script>
+(function () {
+  'use strict'
+
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms) }) }
+
+  /** 门户品牌标题；原生 DocumentTitle 会改写 <title>，由其后的 ensureAll 复原。 */
+  var PORTAL_TITLE = 'HR-Starleap AI'
+
+  /* ---------- Toast ---------- */
+  var toastTimer = null
+  function toast(msg) {
+    var t = document.getElementById('toast')
+    t.textContent = msg
+    t.classList.add('show')
+    clearTimeout(toastTimer)
+    toastTimer = setTimeout(function () { t.classList.remove('show') }, 2600)
+  }
+
+  /* ---------- 右栏收起 ---------- */
+  document.getElementById('rb-collapse').addEventListener('click', function () {
+    document.body.classList.add('rb-collapsed')
+    document.getElementById('rb-restore').classList.add('on')
+  })
+  document.getElementById('rb-restore').addEventListener('click', function () {
+    document.body.classList.remove('rb-collapsed')
+    this.classList.remove('on')
+  })
+
+  /* ---------- 右侧卡片折叠 ---------- */
+  document.getElementById('bonus-toggle').addEventListener('click', function (e) {
+    e.stopPropagation()
+    var card = document.getElementById('card-bonus')
+    var closed = card.classList.toggle('closed')
+    this.textContent = closed ? '＋' : '－'
+  })
+  ;['card-team', 'card-progress', 'card-files'].forEach(function (id) {
+    var head = document.querySelector('#' + id + ' > .card-head')
+    head.addEventListener('click', function () { head.parentElement.classList.toggle('closed') })
+  })
+
+  /* ---------- 交付物下载 ---------- */
+  Array.prototype.forEach.call(document.querySelectorAll('.file-row .dl'), function (btn) {
+    btn.addEventListener('click', function () {
+      var blob = new Blob(['HR-Starleap AI 任务交付物（演示文件）\n\n文件：' + btn.dataset.fn + '\n生成时间：' + new Date().toLocaleString() + '\n'], { type: 'text/plain;charset=utf-8' })
+      var a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = btn.dataset.fn
+      document.body.appendChild(a)
+      a.click()
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove() }, 800)
+      toast('已开始下载 ' + btn.dataset.fn)
+    })
+  })
+
+  /* ================================================================
+   * 注入层：把 HR 菜单与首页内容注入原生应用（原生应用与门户同处一个文档）
+   * 选择器一律用 CSS-modules 语义后缀（重建哈希变化也稳定）+ aria/文本锚点
+   * ================================================================ */
+
+  var CHILD_CSS = [
+    /* ---- 侧栏 HR 导航 ---- */
+    '.hrp-nav{padding:4px 10px 10px}',
+    '.hrp-group{margin:1px 0}',
+    '.hrp-head,.hrp-item{border:none;background:none;box-shadow:none;outline:none;font-family:inherit}',
+    '.hrp-head{display:flex;align-items:center;gap:8px;width:100%;padding:7px 8px;border-radius:8px;font-size:13.5px;font-weight:600;color:#1f2329;text-align:left}',
+    '.hrp-head:hover{background:#f0f2f5}',
+    '.hrp-head .g-icon{width:16px;height:16px;flex:none;color:#1f2329}',
+    '.hrp-head .chev{margin-left:auto;width:13px;height:13px;color:#8a919f;transition:transform .2s}',
+    '.hrp-group.closed .chev{transform:rotate(-180deg)}',
+    '.hrp-group.closed .hrp-body{display:none}',
+    '.hrp-body{padding:1px 0 4px}',
+    '.hrp-item{display:flex;align-items:center;gap:6px;width:100%;text-align:left;padding:6px 8px 6px 25px;border-radius:8px;font-size:13.5px;color:#1f2329;position:relative}',
+    '.hrp-item:hover{background:#f0f2f5}',
+    '.hrp-item .dot{position:absolute;left:15px;color:#b3b9c4;font-weight:700}',
+    '.hrp-item.active{background:#eef4ff;color:#2563eb;font-weight:600}',
+    '.hrp-item.active .dot{display:none}',
+    '.hrp-item.active::before{content:"";position:absolute;left:13px;top:50%;transform:translateY(-50%);width:12px;height:12px;background:#2563eb;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'currentColor\'%3E%3Cpath d=\'M12 3c.5 3.2 1.9 5.3 5 6.2-3.1.9-4.5 3-5 6.2-.5-3.2-1.9-5.3-5-6.2 3.1-.9 4.5-3 5-6.2Z\'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'currentColor\'%3E%3Cpath d=\'M12 3c.5 3.2 1.9 5.3 5 6.2-3.1.9-4.5 3-5 6.2-.5-3.2-1.9-5.3-5-6.2 3.1-.9 4.5-3 5-6.2Z\'/%3E%3C/svg%3E") center/contain no-repeat}',
+    '.hrp-badge{margin-left:6px;font-size:11px;font-weight:600;color:#2563eb;background:#eef4ff;padding:1px 6px;border-radius:5px}',
+    /* ---- 首页注入（原生空态区；仅 home 模式生效，chat 模式隐藏注入内容） ---- */
+    '[data-hrp-mode="home"] [data-hrp-home] > :has([class*="headline"]){display:none}',
+    '[data-hrp-mode="home"] [data-hrp-home] > [class*="heroWorkspaceRow"]{display:none}',
+    '[data-hrp-mode="chat"] [data-hrp-home] > .hrp-home{display:none}',
+    '.hrp-greet{font-size:26px;font-weight:600;letter-spacing:.3px;text-align:center;color:#1f2329;margin:0 24px 34px}',
+    '.hrp-quick{display:grid;grid-template-columns:repeat(2,minmax(150px,185px));gap:12px 16px;justify-content:center}',
+    '.hrp-quick button{display:flex;align-items:center;gap:8px;justify-content:center;height:40px;background:#fff;border:1px solid #e9ebee;border-radius:10px;font-size:13.5px;font-weight:500;color:#1f2329;transition:all .15s}',
+    '.hrp-quick button svg{width:17px;height:17px;color:#1f2329}',
+    '.hrp-quick button:hover{border-color:#3b82f6;color:#2563eb;box-shadow:0 2px 10px rgba(59,130,246,.10)}',
+    '.hrp-quick button:hover svg{color:#2563eb}',
+    '.hrp-stats{margin-top:24px;font-size:13px;color:#8a919f;display:flex;align-items:center;justify-content:center;flex-wrap:wrap}',
+    '.hrp-stats b{color:#4e5561;font-weight:600;margin-left:5px}',
+    '.hrp-stats .sep{margin:0 9px;color:#d3d7de}',
+    /* ---- 顶部标题栏（仅空态显示） ---- */
+    '.hrp-topbar{position:absolute;top:0;left:0;right:0;height:56px;background:#fff;border-bottom:1px solid #eef0f3;display:none;flex-direction:column;justify-content:center;padding:0 24px;z-index:5}',
+    '.hrp-topbar .tt{display:flex;align-items:center;gap:6px;font-size:15.5px;font-weight:600;color:#1f2329}',
+    '.hrp-topbar .tt .chev{width:14px;height:14px;color:#8a919f}',
+    '.hrp-topbar .sub{font-size:12.5px;color:#8a919f;margin-top:2px}',
+    /* ---- 侧栏品牌区（折叠态由 JS 切换：隐藏品牌块、恢复原生鲸鱼 logo、隐藏 HR 菜单） ---- */
+    '.hrp-brand{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:6px 4px;text-align:left}',
+    '.hrp-brand .star{font-size:16px;color:#1f2329;line-height:1;flex:none}',
+    '.hrp-brand .txt{display:flex;flex-direction:column;min-width:0}',
+    '.hrp-brand .name{font-size:14.5px;font-weight:700;color:#1f2329;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '.hrp-brand .sub{font-size:11px;font-weight:500;color:#2563eb;white-space:nowrap}',
+    '.hrp-brand.mini{display:none}'
+  ].join('\n')
+
+  function greetingText() {
+    var h = new Date().getHours()
+    var greet = h < 6 ? '凌晨好' : h < 12 ? '上午好' : h < 14 ? '中午好' : h < 18 ? '下午好' : '晚上好'
+    return greet + '，洪欣。开始你的 AI 团队协作。'
+  }
+
+  var activePrefill = '' /* 默认选中：智能任务助手（data-prefill=""） */
+
+  /* ---- 原生 workbench 导航探测 ----
+     带 workbench 的构建（如 3080 服务器）登录后由 ui-workbench 渲染 aria-label
+     按钮（任务大厅/智能任务助手/AI 团队）；不带 workbench 的构建（如 3088）不渲染。
+     探测到即判定「原生导航在」，门户菜单与右栏全部退位，避免同列双菜单、双右栏。 */
+  var NATIVE_NAV_LABELS = ['任务大厅', '智能任务助手', 'AI 团队']
+  function hasNativeWorkbenchNav(doc) {
+    for (var i = 0; i < NATIVE_NAV_LABELS.length; i++) {
+      var btn = doc.querySelector('button[aria-label="' + NATIVE_NAV_LABELS[i] + '"]')
+      if (btn && !btn.closest('.hrp-nav')) return true
+    }
+    return false
+  }
+
+  var NAV_HTML =
+    '<div class="hrp-group">' +
+      '<button class="hrp-head"><svg class="g-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 4.5V3.8A1.8 1.8 0 0 1 10.8 2h2.4A1.8 1.8 0 0 1 15 3.8v.7"/><path d="m9 13 2 2 4-4.5"/></svg><span>任务大厅</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg></button>' +
+      '<div class="hrp-body">' +
+        '<button class="hrp-item" data-prefill="我要发布一个新任务："><span class="dot">·</span><span>发布任务</span></button>' +
+        '<button class="hrp-item" data-prefill="列出我已接的任务和各自的进度。"><span class="dot">·</span><span>已接任务</span></button>' +
+        '<button class="hrp-item" data-prefill=""><span class="dot">·</span><span>智能任务助手</span></button>' +
+        '<button class="hrp-item" data-prefill="显示当前所有活跃任务的状态和负责人。"><span class="dot">·</span><span>活跃任务</span></button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="hrp-group">' +
+      '<button class="hrp-head"><svg class="g-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5c.6-3 2.8-4.8 5.5-4.8s4.9 1.8 5.5 4.8"/><circle cx="17" cy="9.5" r="2.6"/><path d="M16.5 14.6c2.3.2 3.7 1.7 4.1 4"/></svg><span>AI 团队</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg></button>' +
+      '<div class="hrp-body">' +
+        '<button class="hrp-item" data-prefill="请让 AI 招聘助手协助我处理以下工作："><span class="dot">·</span><span>AI 招聘助手</span></button>' +
+        '<button class="hrp-item" data-prefill="请让 AI 财务专员协助我处理以下工作："><span class="dot">·</span><span>AI 财务专员</span></button>' +
+        '<button class="hrp-item" data-prefill="请让 AI 法务顾问协助我处理以下工作："><span class="dot">·</span><span>AI 法务顾问</span></button>' +
+        '<button class="hrp-item" data-prefill="请让 AI 融资专员协助我处理以下工作："><span class="dot">·</span><span>AI 融资专员</span></button>' +
+        '<button class="hrp-item" data-prefill="请让 AI 行政助理协助我处理以下工作："><span class="dot">·</span><span>AI 行政助理</span></button>' +
+        '<button class="hrp-item" data-prefill="请让 AI 营销策划协助我处理以下工作："><span class="dot">·</span><span>AI 营销策划</span></button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="hrp-group">' +
+      '<button class="hrp-head"><svg class="g-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7A2.5 2.5 0 0 1 6 4.5h3.2c.7 0 1.4.3 1.9.9l1 1.1h6A2.5 2.5 0 0 1 20.5 9v8A2.5 2.5 0 0 1 18 19.5H6A2.5 2.5 0 0 1 3.5 17V7Z"/></svg><span>项目</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg></button>' +
+      '<div class="hrp-body">' +
+        '<button class="hrp-item" data-prefill="打开置顶项目，查看最新进展。"><span class="dot">·</span><span>置顶项目</span></button>' +
+        '<button class="hrp-item" data-prefill="打开重要项目，查看最新进展。"><span class="dot">·</span><span>重要项目</span></button>' +
+        '<button class="hrp-item" data-prefill="打开临时项目，查看最新进展。"><span class="dot">·</span><span>临时项目</span><span class="hrp-badge">new</span></button>' +
+      '</div>' +
+    '</div>'
+
+  var QUICK_HTML =
+    '<div class="hrp-quick">' +
+      '<button data-focus="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 8.2v7.6M8.2 12h7.6"/></svg>新建任务</button>' +
+      '<button data-prefill="请调用 AI 团队协作完成以下任务："><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.2" r="3"/><path d="M4 19.4c.5-2.8 2.5-4.5 5-4.5s4.5 1.7 5 4.5"/><circle cx="16.8" cy="9.4" r="2.4"/><path d="M16.4 14.2c2.1.2 3.4 1.6 3.8 3.9"/></svg>调用 AI 团队</button>' +
+      '<button data-prefill="总结当前所有项目的进度和待办事项。"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="7" width="12.5" height="13.5" rx="2.5"/><path d="M16 7V5.5A2.5 2.5 0 0 0 13.5 3h-7A2.5 2.5 0 0 0 4 5.5v9A2.5 2.5 0 0 0 6.5 17H8"/><path d="M11.5 12h6M11.5 15.5h4"/></svg>查看项目</button>' +
+      '<button data-prefill="生成本月工作报告，包括任务完成情况、AI 团队用量和关键成果。"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 20.5h16.5"/><rect x="6" y="12" width="3" height="8.5" rx="1"/><rect x="10.5" y="8" width="3" height="12.5" rx="1"/><rect x="15" y="4.5" width="3" height="16" rx="1"/></svg>本月报告</button>' +
+    '</div>' +
+    '<div class="hrp-stats">' +
+      '<span>今日任务<b>12</b></span><span class="sep">·</span>' +
+      '<span>进行中<b>5</b></span><span class="sep">·</span>' +
+      '<span>已完成<b>24</b></span><span class="sep">·</span>' +
+      '<span>活跃 AI 员工<b>4/6</b></span>' +
+    '</div>'
+
+  function ensureStyles(doc) {
+    if (doc.getElementById('hrp-style')) return
+    var st = doc.createElement('style')
+    st.id = 'hrp-style'
+    st.textContent = CHILD_CSS
+    doc.head.appendChild(st)
+  }
+
+  /* 原生侧栏根：从"新建会话"按钮向上找全高列 */
+  function findSidebarRoot(doc) {
+    var btn = doc.querySelector('button[aria-label="新建会话"]')
+    if (!btn) return null
+    var el = btn, guard = 0
+    while (el && el !== doc.body && guard++ < 10) {
+      var r = el.getBoundingClientRect()
+      if (r.height > doc.documentElement.clientHeight * 0.75 && r.width > 180 && r.width < 420) return el
+      el = el.parentElement
+    }
+    return null
+  }
+
+  /* 原生会话区根（"工作区"标签所在的 section） */
+  function findSessionsRoot(doc) {
+    var labels = doc.querySelectorAll('[class*="sectionLabel"]')
+    for (var i = 0; i < labels.length; i++) {
+      if (labels[i].textContent.trim() === '工作区') {
+        var header = labels[i].closest('[class*="sectionHeader"]') || labels[i].parentElement
+        return header.parentElement
+      }
+    }
+    return null
+  }
+
+  function buildNav(doc) {
+    var nav = doc.createElement('div')
+    nav.className = 'hrp-nav'
+    nav.innerHTML = NAV_HTML
+    /* 恢复选中态 */
+    var items = nav.querySelectorAll('.hrp-item')
+    for (var i = 0; i < items.length; i++) {
+      if ((items[i].getAttribute('data-prefill') || '') === activePrefill) items[i].classList.add('active')
+    }
+    nav.addEventListener('click', function (e) {
+      var head = e.target.closest('.hrp-head')
+      if (head) { head.parentElement.classList.toggle('closed'); return }
+      var item = e.target.closest('.hrp-item')
+      if (!item) return
+      var all = nav.querySelectorAll('.hrp-item')
+      for (var j = 0; j < all.length; j++) all[j].classList.remove('active')
+      item.classList.add('active')
+      activePrefill = item.getAttribute('data-prefill') || ''
+      startSession(activePrefill)
+    })
+    return nav
+  }
+
+  function ensureNav(doc) {
+    var nav = doc.querySelector('.hrp-nav')
+    /* 原生 workbench 导航已渲染：门户菜单退位（此前注入过的也移除），
+       否则两套菜单同列堆叠。 */
+    if (hasNativeWorkbenchNav(doc)) {
+      if (nav) nav.remove()
+      return
+    }
+    var root = findSidebarRoot(doc)
+    if (!root || nav) return
+    var built = buildNav(doc)
+    var anchor = findSessionsRoot(doc)
+    if (anchor && anchor.parentElement) anchor.parentElement.insertBefore(built, anchor)
+    else root.insertBefore(built, root.children[1] || null)
+  }
+
+  /* ---- 门户右栏策略：原生 workbench 在时隐藏门户右栏（原生右栏 tab 已覆盖
+     赏金积分/AI 团队状态/任务进度/交付物），只留原生那一栏。 ---- */
+  var rightbarForced = false
+  function applyRightbarPolicy(doc) {
+    var bar = doc.getElementById('rightbar')
+    var restore = doc.getElementById('rb-restore')
+    if (hasNativeWorkbenchNav(doc)) {
+      if (!rightbarForced) {
+        rightbarForced = true
+        /* #root 占满视口，避免被 --rbw 预留出 312px 空洞 */
+        doc.body.classList.add('rb-collapsed')
+        if (bar) bar.style.display = 'none'
+        if (restore) restore.style.display = 'none'
+      }
+    } else if (rightbarForced) {
+      rightbarForced = false
+      doc.body.classList.remove('rb-collapsed')
+      if (bar) bar.style.display = ''
+      if (restore) restore.style.display = ''
+    }
+  }
+
+  /* 原生空态 stack（探索未至之境 + 居中 composer） */
+  function findHeroStack(doc) {
+    var heads = doc.querySelectorAll('[class*="headline"]')
+    var target = null
+    for (var i = 0; i < heads.length; i++) {
+      if (heads[i].textContent.indexOf('探索未至之境') !== -1) { target = heads[i]; break }
+    }
+    if (!target) return null
+    var el = target, guard = 0
+    while (el && el !== doc.body && guard++ < 8) {
+      if (/composerHero|composerStack/.test(String(el.className))) return el
+      el = el.parentElement
+    }
+    return null
+  }
+
+  function ensureHome(doc) {
+    var stack = findHeroStack(doc)
+    if (!stack) return
+    stack.setAttribute('data-hrp-home', '1')
+    applyHeroLayout(doc, stack)
+    var greet = stack.querySelector('.hrp-greet')
+    if (!greet) {
+      greet = doc.createElement('div')
+      greet.className = 'hrp-home hrp-greet'
+      greet.textContent = greetingText()
+      stack.insertBefore(greet, stack.children[0] || null)
+    }
+    var quick = stack.querySelector('.hrp-quick-wrap')
+    if (!quick) {
+      quick = doc.createElement('div')
+      quick.className = 'hrp-home hrp-quick-wrap'
+      quick.innerHTML = QUICK_HTML
+      quick.addEventListener('click', function (e) {
+        var b = e.target.closest('button')
+        if (!b) return
+        var prefill = b.getAttribute('data-prefill')
+        if (!prefill) { /* 新建任务：仅聚焦输入框 */
+          var c = findComposer(doc)
+          if (c) c.focus()
+          return
+        }
+        var el = findComposer(doc)
+        if (el) { setNativeValue(doc, el, prefill); el.focus() }
+      })
+      /* 快捷区插到被隐藏的 agent 行之后（问候语下方、输入框上方） */
+      var anchor = stack.querySelector('[class*="heroWorkspaceRow"]') || stack.children[1]
+      if (anchor && anchor.parentElement === stack) anchor.after(quick)
+      else stack.appendChild(quick)
+    }
+  }
+
+  /* 贴底布局：空态区撑满视口高，内容置顶偏上，输入框贴底（对齐参考图） */
+  function applyHeroLayout(doc, stack) {
+    if (stack.style.justifyContent !== 'flex-start') {
+      stack.style.justifyContent = 'flex-start'
+      stack.style.height = '100%'
+      stack.style.paddingTop = 'min(36vh, 324px)'
+    }
+    var el = stack.parentElement, seat = null, guard = 0
+    while (el && el !== doc.body && guard++ < 6) {
+      if (/composerSeat/.test(String(el.className))) { seat = el; break }
+      el = el.parentElement
+    }
+    if (seat && seat.style.height !== '100%') seat.style.height = '100%'
+    var composer = findComposer(doc)
+    if (composer) {
+      var wrap = composer, g2 = 0
+      while (wrap && wrap.parentElement !== stack && g2++ < 8) wrap = wrap.parentElement
+      if (wrap && wrap.parentElement === stack) {
+        var t = getComputedStyle(wrap).display === 'contents' ? (wrap.firstElementChild || wrap) : wrap
+        if (t && t.style.marginTop !== 'auto') t.style.marginTop = 'auto'
+      }
+    }
+  }
+
+  /* 对话态：清除空态 inline 布局，交还原生（composerStack 为对话/空态共用容器） */
+  function clearHeroLayout(doc) {
+    var stack = doc.querySelector('[data-hrp-home]')
+    if (!stack) return
+    stack.style.cssText = ''
+    var seat = stack.closest('[class*="composerSeat"]')
+    if (seat) seat.style.height = ''
+    var composer = findComposer(doc)
+    if (composer) {
+      var wrap = composer, g = 0
+      while (wrap && wrap.parentElement !== stack && g++ < 8) wrap = wrap.parentElement
+      if (wrap && wrap.parentElement === stack) {
+        var t = getComputedStyle(wrap).display === 'contents' ? (wrap.firstElementChild || wrap) : wrap
+        if (t) t.style.marginTop = ''
+      }
+    }
+  }
+
+  /* 顶部标题栏：仅 home 模式显示（对话态由原生 header 接管） */
+  function ensureTopbar(doc, chat) {
+    var bar = doc.querySelector('.hrp-topbar')
+    if (chat) { if (bar) bar.style.display = 'none'; return }
+    var stack = findHeroStack(doc)
+    if (!stack) return
+    var sb = stack.closest('[class*="scrollBody"]')
+    var root = sb ? sb.parentElement : null
+    root = root && root.parentElement ? root.parentElement : root
+    if (!root) return
+    if (!bar) {
+      bar = doc.createElement('div')
+      bar.className = 'hrp-topbar'
+      bar.innerHTML =
+        '<div class="tt">HR-Agent 平台服务' +
+        '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></div>' +
+        '<div class="sub">郝天框</div>'
+      root.insertBefore(bar, root.children[0] || null)
+      if (getComputedStyle(root).position === 'static') root.style.position = 'relative'
+    }
+    bar.style.display = 'flex'
+  }
+
+  /* 侧栏品牌区：展开态替换原生 DSH logo；折叠态恢复原生鲸鱼 logo 并隐藏 HR 菜单。
+     宽度检测锚定 logoRow 本身（侧栏折叠后 findSidebarRoot 的宽度条件不再命中）。 */
+  function ensureBrand(doc) {
+    var row = doc.querySelector('[class*="logoRow"]')
+    if (!row) return
+    var brand = row.querySelector('.hrp-brand')
+    if (!brand) {
+      brand = doc.createElement('div')
+      brand.className = 'hrp-brand'
+      brand.innerHTML = '<span class="star">✦</span><span class="txt"><span class="name">HR-Starleap AI</span><span class="sub">Starleap-HR AI</span></span>'
+      row.insertBefore(brand, row.children[0] || null)
+    }
+    var mini = row.getBoundingClientRect().width < 80
+    brand.classList.toggle('mini', mini)
+    var native = row.querySelector(':scope > [class*="brand"]:not(.hrp-brand)')
+    if (native) native.style.display = mini ? '' : 'none'
+    var nav = doc.querySelector('.hrp-nav')
+    if (nav) nav.style.display = mini ? 'none' : ''
+  }
+
+  /* ---------- 窄视口下的原生侧栏折叠 ----------
+     原生侧栏在 <1024px 的帧宽下自动折叠（ui-layout 的 SIDEBAR_AUTO_COLLAPSE）：
+     折叠态列宽仅 56px，`新建会话` 按钮不渲染，findSidebarRoot 的宽度条件必然落空，
+     HR 菜单无处挂载。注入层需要展开的侧栏，因此折叠时主动展开；用户点过原生切换
+     按钮则以其选择为准（userWantsSidebar === false 时不再干预）。 */
+  var autoExpandGuard = false
+  var userWantsSidebar = null /* null=未表态（按门户需要展开）、true=要展开、false=要折叠 */
+
+  function nativeCollapsed(doc) {
+    return !!doc.querySelector('[data-sidebar-collapsed]')
+  }
+
+  function expandNativeSidebar(doc) {
+    var row = doc.querySelector('[class*="logoRow"]')
+    var btn = row ? row.querySelector('button[class*="toggle"]') : null
+    if (!btn) return
+    autoExpandGuard = true
+    try { btn.click() } finally { autoExpandGuard = false }
+  }
+
+  /* 记录用户意图：捕获阶段读到的是点击前的折叠状态，即用户想要的目标状态。 */
+  var trackedDoc = null
+  function trackSidebarIntent(doc) {
+    if (doc === trackedDoc) return
+    trackedDoc = doc
+    doc.addEventListener('click', function (e) {
+      var target = e.target
+      var btn = target && target.closest ? target.closest('button[class*="toggle"]') : null
+      if (!btn || autoExpandGuard) return
+      userWantsSidebar = nativeCollapsed(doc)
+    }, true)
+  }
+
+  /* ---------- 观察原生 DOM：被 React 重绘后自动补挂 ---------- */
+  var observer = null
+  var obsTimer = null
+  function ensureAll() {
+    var doc = document
+    if (!doc.body) return
+    try {
+      ensureStyles(doc)
+      /* 原生 DocumentTitle 会把标题改写成产品名/会话名；门户品牌名保持不变。
+         只改 <head> 内的 title，不触发 body 的 observer。 */
+      if (doc.title !== PORTAL_TITLE) doc.title = PORTAL_TITLE
+      /* 模式切换：composerStack 为对话/空态共用容器，tabs 仅对话态渲染 */
+      var chat = !!doc.querySelector('[class*="tabs"]')
+      var html = doc.documentElement
+      var prevMode = html.getAttribute('data-hrp-mode')
+      var mode = chat ? 'chat' : 'home'
+      if (prevMode !== mode) {
+        html.setAttribute('data-hrp-mode', mode)
+        if (chat && prevMode === 'home') clearHeroLayout(doc)
+      }
+      ensureBrand(doc)
+      applyRightbarPolicy(doc)
+      if (nativeCollapsed(doc)) {
+        if (userWantsSidebar !== false) expandNativeSidebar(doc)
+      } else {
+        ensureNav(doc)
+      }
+      if (!chat) ensureHome(doc)
+      ensureTopbar(doc, chat)
+    } catch (e) { /* 原生重渲染竞态：下一轮 observer 补挂 */ }
+  }
+  function startObserver(doc) {
+    if (observer) observer.disconnect()
+    observer = new doc.defaultView.MutationObserver(function () {
+      clearTimeout(obsTimer)
+      obsTimer = setTimeout(ensureAll, 350)
+    })
+    observer.observe(doc.body, { childList: true, subtree: true })
+  }
+
+  /* ---------- 同源驱动：新建会话 + 自动发送 ---------- */
+  var pendingText = null
+  var driving = false
+
+  function setNativeValue(doc, el, text) {
+    el.focus()
+    if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
+      var proto = el.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype
+      var setter = Object.getOwnPropertyDescriptor(proto, 'value').set
+      setter.call(el, text)
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+    } else {
+      document.execCommand('insertText', false, text)
+      el.dispatchEvent(new InputEvent('input', { bubbles: true, data: text }))
+    }
+  }
+
+  function findComposer(doc) {
+    return doc.querySelector('textarea[placeholder]') || doc.querySelector('textarea') ||
+      doc.querySelector('[contenteditable="true"]')
+  }
+
+  function pollComposer(doc, timeoutMs) {
+    var deadline = Date.now() + timeoutMs
+    return new Promise(function (resolve) {
+      ;(function tick() {
+        var el = findComposer(doc)
+        if (el) return resolve(el)
+        if (Date.now() > deadline) return resolve(null)
+        setTimeout(tick, 300)
+      })()
+    })
+  }
+
+  async function driveNative() {
+    if (pendingText === null) return
+    if (driving) { setTimeout(driveNative, 600); return }
+    driving = true
+    var text = pendingText
+    try {
+      var doc = document
+      var el = await pollComposer(doc, 30000)
+      if (!el) { toast('界面加载较慢，请稍后在输入框中手动操作'); return }
+      await sleep(400)
+      /* 新建会话，保证菜单发起的是全新对话 */
+      var newBtn = doc.querySelector('button[aria-label="新建会话"]') || doc.querySelector('button[title="新建会话"]')
+      if (newBtn) { try { newBtn.click() } catch (e) {} await sleep(600) }
+      el = findComposer(doc) || el
+      if (!text) { /* 空指令（智能任务助手）：仅回到新会话空态 */ pendingText = null; return }
+      var ok = false
+      for (var attempt = 0; attempt < 3 && !ok; attempt++) {
+        setNativeValue(doc, el, text)
+        await sleep(400)
+        var send = doc.querySelector('button[aria-label*="发送"]') || doc.querySelector('button[title*="发送"]')
+        if (send && !send.disabled) { send.click(); ok = true } else {
+          el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }))
+          ok = !findComposer(doc) || (findComposer(doc).value || findComposer(doc).textContent || '').trim() === ''
+        }
+        if (!ok) await sleep(900)
+      }
+      if (!ok) toast('已打开对话，请手动点击发送（内容已填入）')
+      if (pendingText === text) pendingText = null
+    } finally {
+      driving = false
+    }
+  }
+
+  function startSession(text) {
+    pendingText = text
+    driveNative()
+  }
+
+  /* ---------- 启动：等待原生应用挂载后注入 ----------
+     只等 logoRow（侧栏）出现；composer 可能因工作区未选/挂载失败而不渲染，
+     不能作为启动前置条件，否则要空等 30s 超时才注入。 */
+  ;(async function boot() {
+    var deadline = Date.now() + 30000
+    while (Date.now() < deadline) {
+      if (document.body && document.querySelector('[class*="logoRow"]')) break
+      await sleep(300)
+    }
+    trackSidebarIntent(document)
+    ensureAll()
+    startObserver(document)
+  })()
+})()
+</script>
+</body>
+</html>

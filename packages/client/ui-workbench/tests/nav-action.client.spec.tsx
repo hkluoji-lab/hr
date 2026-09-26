@@ -66,28 +66,28 @@ describe('WorkbenchNavAction', () => {
     render(<WorkbenchNavAction {...props({ target: 'team' })} />)
     const toggle = screen.getByRole('button', { name: zh['nav.team.toggle'] })
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
-    expect(screen.queryByRole('button', { name: zh['nav.role.secretary'] })).toBeNull()
+    expect(screen.queryByRole('button', { name: zh['nav.role.admin'] })).toBeNull()
   })
 
   it('a role row toggles its capability children', () => {
     render(<WorkbenchNavAction {...props({ target: 'team' })} />)
     fireEvent.click(screen.getByRole('button', { name: zh['nav.team.toggle'] }))
-    const accountant = screen.getByRole('button', { name: zh['nav.role.accountant'] })
-    expect(screen.queryByRole('button', { name: `AI-${zh['role.accountant.tag.books']}` })).toBeNull()
+    const finance = screen.getByRole('button', { name: zh['nav.role.finance'] })
+    expect(screen.queryByRole('button', { name: `AI-${zh['role.finance.tag.books']}` })).toBeNull()
 
-    fireEvent.click(accountant)
-    expect(screen.getByRole('button', { name: `AI-${zh['role.accountant.tag.books']}` })).toBeTruthy()
+    fireEvent.click(finance)
+    expect(screen.getByRole('button', { name: `AI-${zh['role.finance.tag.books']}` })).toBeTruthy()
 
-    fireEvent.click(accountant)
-    expect(screen.queryByRole('button', { name: `AI-${zh['role.accountant.tag.books']}` })).toBeNull()
+    fireEvent.click(finance)
+    expect(screen.queryByRole('button', { name: `AI-${zh['role.finance.tag.books']}` })).toBeNull()
   })
 
   it('a capability child opens the team page through openTeam', () => {
     const openTeam = vi.fn()
     render(<WorkbenchNavAction {...props({ target: 'team', openTeam })} />)
     fireEvent.click(screen.getByRole('button', { name: zh['nav.team.toggle'] }))
-    fireEvent.click(screen.getByRole('button', { name: zh['nav.role.secretary'] }))
-    fireEvent.click(screen.getByRole('button', { name: `AI-${zh['role.secretary.tag.service']}` }))
+    fireEvent.click(screen.getByRole('button', { name: zh['nav.role.admin'] }))
+    fireEvent.click(screen.getByRole('button', { name: `AI-${zh['role.admin.tag.schedule']}` }))
     expect(openTeam).toHaveBeenCalledTimes(1)
   })
 
@@ -95,14 +95,14 @@ describe('WorkbenchNavAction', () => {
     render(<WorkbenchNavAction {...props({ target: 'team' })} />)
     const toggle = screen.getByRole('button', { name: zh['nav.team.toggle'] })
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
-    expect(screen.queryByRole('button', { name: zh['nav.role.secretary'] })).toBeNull()
+    expect(screen.queryByRole('button', { name: zh['nav.role.admin'] })).toBeNull()
 
     fireEvent.click(toggle)
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
-    expect(screen.getByRole('button', { name: zh['nav.role.secretary'] })).toBeTruthy()
+    expect(screen.getByRole('button', { name: zh['nav.role.admin'] })).toBeTruthy()
 
     fireEvent.click(toggle)
-    expect(screen.queryByRole('button', { name: zh['nav.role.secretary'] })).toBeNull()
+    expect(screen.queryByRole('button', { name: zh['nav.role.admin'] })).toBeNull()
   })
 
   it('renders the owner-only members row for the owner and nothing for everyone else', () => {
@@ -142,12 +142,12 @@ describe('WorkbenchNavAction', () => {
   it('scopes the team role groups to the bound member\'s roles', () => {
     render(<WorkbenchNavAction {...props({
       target: 'team',
-      useMy: () => ({ name: null, roles: ['accountant'], isOwner: false }),
+      useMy: () => ({ name: null, roles: ['finance'], isOwner: false }),
     })} />)
     fireEvent.click(screen.getByRole('button', { name: zh['nav.team.toggle'] }))
 
-    expect(screen.getByRole('button', { name: zh['nav.role.accountant'] })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: zh['nav.role.secretary'] })).toBeNull()
+    expect(screen.getByRole('button', { name: zh['nav.role.finance'] })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: zh['nav.role.admin'] })).toBeNull()
     expect(screen.queryByRole('button', { name: zh['nav.role.legal'] })).toBeNull()
   })
 })

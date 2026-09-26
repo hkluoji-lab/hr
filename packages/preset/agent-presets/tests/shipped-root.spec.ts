@@ -90,7 +90,7 @@ describe('the shipped preset root', () => {
 
     const listed = await ctx.agentPresets.list()
     expect(listed.map(preset => preset.id).sort())
-      .toEqual(['accountant', 'audit', 'cordis', 'legal', 'minimal', 'ptc', 'secretary', 'standard'])
+      .toEqual(['admin', 'cordis', 'finance', 'financing', 'legal', 'marketing', 'minimal', 'ptc', 'recruiting', 'standard'])
     expect(listed.every(preset => preset.trust === 'system')).toBe(true)
     // Not `broken === undefined`: health asks whether each row's package is
     // installed above the base, and the shipped rows name packages the
@@ -130,7 +130,7 @@ describe('the shipped preset root', () => {
   })
 
   it('enables web_fetch in each tool-bearing Web app preset', async () => {
-    for (const id of ['accountant', 'audit', 'cordis', 'legal', 'ptc', 'secretary', 'standard']) {
+    for (const id of ['admin', 'cordis', 'finance', 'financing', 'legal', 'marketing', 'ptc', 'recruiting', 'standard']) {
       const entries = await shippedEntries(id)
       const toolWeb: unknown = entries.find((entry: unknown) =>
         typeof entry === 'object' && entry !== null && 'id' in entry && entry.id === 'tool-web')

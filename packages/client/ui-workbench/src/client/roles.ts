@@ -1,5 +1,5 @@
 /**
- * The four AI-company roles the workbench hero presents. Each role decorates
+ * The six AI-company roles the workbench hero presents. Each role decorates
  * one agent preset whose published name contains the role's Chinese keyword:
  * the emoji glyph stands in for the design's cropped icon art, and every
  * human-facing string stays a locale key (no hardcoded copy in components).
@@ -7,7 +7,7 @@
 import type { WorkbenchKey } from './locales.ts'
 
 /** Stable role id, shared with the host member-binding contract. */
-export type RoleId = 'secretary' | 'accountant' | 'legal' | 'audit'
+export type RoleId = 'recruiting' | 'finance' | 'legal' | 'financing' | 'admin' | 'marketing'
 
 /** One role's presentation metadata. */
 export interface RoleMeta {
@@ -23,30 +23,68 @@ export interface RoleMeta {
   tagKeys: readonly WorkbenchKey[]
 }
 
-/** The four roles in hero display order. */
+/** One preset task a role's workbench card can start with one click. */
+export interface RoleAction {
+  /** Stable action id within the role. */
+  id: string
+  /** Locale key of the button label. */
+  labelKey: WorkbenchKey
+  /** Locale key of the brief submitted as the session's first user message. */
+  briefKey: WorkbenchKey
+}
+
+/** The preset actions each company role's card offers, in display order. */
+export const ROLE_ACTIONS: Record<RoleId, readonly RoleAction[]> = {
+  recruiting: [
+    { id: 'screen', labelKey: 'team.action.recruiting.screen', briefKey: 'team.brief.recruiting.screen' },
+    { id: 'interview', labelKey: 'team.action.recruiting.interview', briefKey: 'team.brief.recruiting.interview' },
+  ],
+  finance: [
+    { id: 'books', labelKey: 'team.action.finance.books', briefKey: 'team.brief.finance.books' },
+    { id: 'monthly', labelKey: 'team.action.finance.monthly', briefKey: 'team.brief.finance.monthly' },
+  ],
+  legal: [
+    { id: 'compliance', labelKey: 'team.action.legal.compliance', briefKey: 'team.brief.legal.compliance' },
+    { id: 'charter', labelKey: 'team.action.legal.charter', briefKey: 'team.brief.legal.charter' },
+  ],
+  financing: [
+    { id: 'materials', labelKey: 'team.action.financing.materials', briefKey: 'team.brief.financing.materials' },
+    { id: 'diligence', labelKey: 'team.action.financing.diligence', briefKey: 'team.brief.financing.diligence' },
+  ],
+  admin: [
+    { id: 'chase', labelKey: 'team.action.admin.chase', briefKey: 'team.brief.admin.chase' },
+    { id: 'archive', labelKey: 'team.action.admin.archive', briefKey: 'team.brief.admin.archive' },
+  ],
+  marketing: [
+    { id: 'plan', labelKey: 'team.action.marketing.plan', briefKey: 'team.brief.marketing.plan' },
+    { id: 'review', labelKey: 'team.action.marketing.review', briefKey: 'team.brief.marketing.review' },
+  ],
+}
+
+/** The six roles in hero display order. */
 export const ROLES: readonly RoleMeta[] = [
   {
-    id: 'secretary',
-    match: '秘书',
-    emoji: '📋',
-    descKey: 'role.secretary.desc',
+    id: 'recruiting',
+    match: '招聘',
+    emoji: '🧑‍💼',
+    descKey: 'role.recruiting.desc',
     tagKeys: [
-      'role.secretary.tag.service',
-      'role.secretary.tag.contract',
-      'role.secretary.tag.chase',
-      'role.secretary.tag.archive',
+      'role.recruiting.tag.screen',
+      'role.recruiting.tag.interview',
+      'role.recruiting.tag.offer',
+      'role.recruiting.tag.onboard',
     ],
   },
   {
-    id: 'accountant',
-    match: '会计',
+    id: 'finance',
+    match: '财务',
     emoji: '💰',
-    descKey: 'role.accountant.desc',
+    descKey: 'role.finance.desc',
     tagKeys: [
-      'role.accountant.tag.books',
-      'role.accountant.tag.invoice',
-      'role.accountant.tag.monthly',
-      'role.accountant.tag.reconcile',
+      'role.finance.tag.books',
+      'role.finance.tag.invoice',
+      'role.finance.tag.monthly',
+      'role.finance.tag.reconcile',
     ],
   },
   {
@@ -56,21 +94,45 @@ export const ROLES: readonly RoleMeta[] = [
     descKey: 'role.legal.desc',
     tagKeys: [
       'role.legal.tag.charter',
+      'role.legal.tag.contract',
       'role.legal.tag.resolution',
-      'role.legal.tag.equity',
       'role.legal.tag.compliance',
     ],
   },
   {
-    id: 'audit',
-    match: '审计',
-    emoji: '🔍',
-    descKey: 'role.audit.desc',
+    id: 'financing',
+    match: '融资',
+    emoji: '📈',
+    descKey: 'role.financing.desc',
     tagKeys: [
-      'role.audit.tag.papers',
-      'role.audit.tag.tick',
-      'role.audit.tag.sample',
-      'role.audit.tag.report',
+      'role.financing.tag.bp',
+      'role.financing.tag.diligence',
+      'role.financing.tag.pitch',
+      'role.financing.tag.term',
+    ],
+  },
+  {
+    id: 'admin',
+    match: '行政',
+    emoji: '📋',
+    descKey: 'role.admin.desc',
+    tagKeys: [
+      'role.admin.tag.schedule',
+      'role.admin.tag.minutes',
+      'role.admin.tag.chase',
+      'role.admin.tag.archive',
+    ],
+  },
+  {
+    id: 'marketing',
+    match: '营销',
+    emoji: '📣',
+    descKey: 'role.marketing.desc',
+    tagKeys: [
+      'role.marketing.tag.content',
+      'role.marketing.tag.lead',
+      'role.marketing.tag.campaign',
+      'role.marketing.tag.review',
     ],
   },
 ]

@@ -1,4 +1,4 @@
-# The `audit` agent preset: the team's AI auditor, mounted once per process.
+# The `financing` agent preset: the team's AI fundraising specialist, mounted once per process.
 #
 # This file is an AGENT-PLANE composition. The roster mounts it ONCE under a
 # standing scope; every session naming it joins by scope parentage, so the
@@ -26,8 +26,9 @@
   config:
     suffix: Your working directory is {{cwd}}.
     prefix: >-
-      You are the team's AI auditor, powered by the {{model}} model. You sample
-      records, cross-check figures, and report risks.
+      You are the team's AI fundraising specialist, powered by the {{model}}
+      model. You assemble fundraising materials, run due diligence, and prepare
+      the investor narrative.
 
 - id: agent-instructions
   name: '@deepseek-ai/dsh-agent-instructions'

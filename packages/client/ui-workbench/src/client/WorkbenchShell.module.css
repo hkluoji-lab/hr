@@ -1,5 +1,6 @@
-/* The frame-wide workbench page surface: a full-bleed panel inside the shell's
-   overlay layer. Every color carries a fallback so the page stays legible under
+/* The workbench page surface: a panel inside the shell's overlay layer that
+   starts at the frame's sidebar edge (inline left set by the shell) and covers
+   the rest. Every color carries a fallback so the page stays legible under
    a theme that redefines the surface tokens. */
 
 .root {

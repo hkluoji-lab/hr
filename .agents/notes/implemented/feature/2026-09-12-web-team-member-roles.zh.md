@@ -6,11 +6,11 @@ Status: implemented
 
 ## Problem
 
-登录面此前只有账号：每个登录手机号看到同一个工作台，无岗位、无范围。部署需要手机号绑定 AI 团队岗位（秘书、会计、法务、审计）、一个手机号可持多岗，并在登录后进入按角色划定的工作区——本期不在服务端做任务级数据隔离。成员如何加入、谁有资格拉人、每条规则住在哪里，必须先于任何 UI 过滤固定下来。
+登录面此前只有账号：每个登录手机号看到同一个工作台，无岗位、无范围。部署需要手机号绑定 AI 团队岗位（招聘、财务、法务、融资、行政、营销）、一个手机号可持多岗，并在登录后进入按角色划定的工作区——本期不在服务端做任务级数据隔离。成员如何加入、谁有资格拉人、每条规则住在哪里，必须先于任何 UI 过滤固定下来。
 
 ## Decision
 
-**成员制活在 `dsh-web-login`，叠在账号之上。** `web_login` 域新增两张表：`members`（按手机号存 `{roles, grantedBy, grantedAt}`）与 `invites`（按邀请码存 `{roles, createdBy, createdAt, expiresAt, acceptedAt?}`）。owner 不存储在任何地方：每次调用派生为最早注册的账户（平局按手机号串序），因此所有权跟随 accounts 表、不可能与它相悖。加入仅凭邀请：owner 为一组校验通过的岗位创建一次性邀请（`POST /team/invites`，6 字节随机 base64url 码，有效期是 Config `inviteValiditySeconds`，默认一周），任何已登录手机号可兑换（`POST /team/invites/redeem`），把邀请的角色并入既有绑定并盖 `acceptedAt`，重放即 409。owner 通过 `GET /team/members` 与 `DELETE /team/members/:phone` 管理名册；解绑 owner 本人被拒绝，否则所有权会照样留存。对已注册的账号，owner 可以跳过邀请环节：`PUT /team/members/:phone` 一次调用为该账号整体指派岗位集合，替换既有绑定——这是对单个成员绑定的编辑决策，刻意不是邀请兑换的并集。五条管理路由对未登录答 401、对 owner 以外的人答 403，`/auth/status` 扩展 `roles?` 与 `isOwner?`，消费者无需第二次读取。角色 id（`secretary`/`accountant`/`legal`/`audit`）就是客户端工作台 `roles.ts` 的词表，由一个 zod schema 校验（非空、无重复）。
+**成员制活在 `dsh-web-login`，叠在账号之上。** `web_login` 域新增两张表：`members`（按手机号存 `{roles, grantedBy, grantedAt}`）与 `invites`（按邀请码存 `{roles, createdBy, createdAt, expiresAt, acceptedAt?}`）。owner 不存储在任何地方：每次调用派生为最早注册的账户（平局按手机号串序），因此所有权跟随 accounts 表、不可能与它相悖。加入仅凭邀请：owner 为一组校验通过的岗位创建一次性邀请（`POST /team/invites`，6 字节随机 base64url 码，有效期是 Config `inviteValiditySeconds`，默认一周），任何已登录手机号可兑换（`POST /team/invites/redeem`），把邀请的角色并入既有绑定并盖 `acceptedAt`，重放即 409。owner 通过 `GET /team/members` 与 `DELETE /team/members/:phone` 管理名册；解绑 owner 本人被拒绝，否则所有权会照样留存。对已注册的账号，owner 可以跳过邀请环节：`PUT /team/members/:phone` 一次调用为该账号整体指派岗位集合，替换既有绑定——这是对单个成员绑定的编辑决策，刻意不是邀请兑换的并集。五条管理路由对未登录答 401、对 owner 以外的人答 403，`/auth/status` 扩展 `roles?` 与 `isOwner?`，消费者无需第二次读取。角色 id（`recruiting`/`finance`/`legal`/`financing`/`admin`/`marketing`）就是客户端工作台 `roles.ts` 的词表，由一个 zod schema 校验（非空、无重复）。
 
 **域版本保持 1。** `single` 布局读取严格匹配声明版本，升到 2 会让所有既有 `web_login.json` 介质在打开时被拒。纯新增声明表是兼容的：既有 `accounts` 表 schema 不变，早于新表的介质把缺失表解析为空。因此两张新表随版本 1 发布。
 

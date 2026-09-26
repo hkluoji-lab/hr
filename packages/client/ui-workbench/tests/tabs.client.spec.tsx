@@ -263,8 +263,8 @@ describe('TeamStatusTab', () => {
       members: [
         { id: 'standard', name: '标准模式', description: '', state: 'online', role: undefined },
         { id: 'crew', name: '经营团队', description: '', state: 'busy', role: undefined },
-        { id: 'secretary', name: 'AI 秘书', description: '', state: 'online', role: roleOf('AI 秘书') },
-        { id: 'audit', name: 'AI 审计', description: '', state: 'offline', role: roleOf('AI 审计') },
+        { id: 'admin', name: 'AI 行政', description: '', state: 'online', role: roleOf('AI 行政') },
+        { id: 'marketing', name: 'AI 营销', description: '', state: 'offline', role: roleOf('AI 营销') },
       ],
       online: 1, busy: 0, offline: 1,
     }
@@ -272,8 +272,8 @@ describe('TeamStatusTab', () => {
 
     // Counts read the role roster: one online role member, one offline.
     expect(view.getAllByText('1')).toHaveLength(2)
-    expect(view.getByText('AI 秘书')).toBeTruthy()
-    expect(view.getByText('AI 审计')).toBeTruthy()
+    expect(view.getByText('AI 行政')).toBeTruthy()
+    expect(view.getByText('AI 营销')).toBeTruthy()
     expect(view.queryByText('标准模式')).toBeNull()
     expect(view.queryByText('经营团队')).toBeNull()
   })

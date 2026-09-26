@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-11-workbench-host-and-session-tabs.md
-2026-09-11-workbench-host-and-session-tabs.md: 9054f67b8447d87246192f0608c652e7d9f87074
-2026-09-11-workbench-host-and-session-tabs.zh.md: 3740311274469ad7e5bd63238324338f0a4d7154
+2026-09-11-workbench-host-and-session-tabs.md: 4f6474a9082a9cc3b49daa5ea1c4347a96875d51
+2026-09-11-workbench-host-and-session-tabs.zh.md: 705bc62760f1c24d2bbd9334ff34eaf16b879f1b

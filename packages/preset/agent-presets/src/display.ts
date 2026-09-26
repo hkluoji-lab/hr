@@ -13,10 +13,12 @@ export type BuiltInPresetCopyKey =
   | 'presetPtcName' | 'presetPtcDescription'
   | 'presetMinimalName' | 'presetMinimalDescription'
   | 'presetCordisName' | 'presetCordisDescription'
-  | 'presetSecretaryName' | 'presetSecretaryDescription'
-  | 'presetAccountantName' | 'presetAccountantDescription'
+  | 'presetRecruitingName' | 'presetRecruitingDescription'
+  | 'presetFinanceName' | 'presetFinanceDescription'
   | 'presetLegalName' | 'presetLegalDescription'
-  | 'presetAuditName' | 'presetAuditDescription'
+  | 'presetFinancingName' | 'presetFinancingDescription'
+  | 'presetAdminName' | 'presetAdminDescription'
+  | 'presetMarketingName' | 'presetMarketingDescription'
 
 /** Preset roster fields needed to resolve display copy. */
 export interface PresetDisplaySource {
@@ -48,10 +50,12 @@ const BUILT_IN_PRESET_KEYS: Readonly<Partial<Record<string, PresetLocaleKeys>>> 
   ptc: { name: 'presetPtcName', description: 'presetPtcDescription' },
   minimal: { name: 'presetMinimalName', description: 'presetMinimalDescription' },
   cordis: { name: 'presetCordisName', description: 'presetCordisDescription' },
-  secretary: { name: 'presetSecretaryName', description: 'presetSecretaryDescription' },
-  accountant: { name: 'presetAccountantName', description: 'presetAccountantDescription' },
+  recruiting: { name: 'presetRecruitingName', description: 'presetRecruitingDescription' },
+  finance: { name: 'presetFinanceName', description: 'presetFinanceDescription' },
   legal: { name: 'presetLegalName', description: 'presetLegalDescription' },
-  audit: { name: 'presetAuditName', description: 'presetAuditDescription' },
+  financing: { name: 'presetFinancingName', description: 'presetFinancingDescription' },
+  admin: { name: 'presetAdminName', description: 'presetAdminDescription' },
+  marketing: { name: 'presetMarketingName', description: 'presetMarketingDescription' },
 }
 
 /**

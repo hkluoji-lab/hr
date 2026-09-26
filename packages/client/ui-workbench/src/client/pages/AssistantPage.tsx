@@ -9,11 +9,11 @@
  * the team page show), so mode and other non-role presets are never assignable
  * here.
  *
- * Collaboration mode replaces the picker: the brief goes to the AI secretary
- * prefixed with an orchestration template, and the secretary composes a
- * workflow that triages the brief and dispatches the accountant, legal, and
- * audit roles as subagents before an audit review consolidates them. Roles are
- * the workflow's output, so picking one member would contradict the mode.
+ * Collaboration mode replaces the picker: the brief goes to the AI admin
+ * prefixed with an orchestration template, and the admin composes a workflow
+ * that triages the brief and dispatches the finance, legal, and marketing roles
+ * as subagents before an admin review consolidates them. Roles are the
+ * workflow's output, so picking one member would contradict the mode.
  */
 import { useState } from 'react'
 import { Button, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -45,12 +45,12 @@ export function AssistantPage({ state, onAssign, t }: AssistantPageProps) {
   const [collab, setCollab] = useState(false)
   const trimmed = brief.trim()
   const roster = roleMembers(state.members)
-  const secretary = roster.find(member => member.role?.id === 'secretary')
+  const admin = roster.find(member => member.role?.id === 'admin')
 
   const submit = () => {
     if (trimmed.length === 0) return
     onAssign(
-      collab ? secretary?.id : selected,
+      collab ? admin?.id : selected,
       collab ? t('assistant.collaborationTemplate', { brief: trimmed }) : trimmed,
     )
   }
@@ -81,7 +81,7 @@ export function AssistantPage({ state, onAssign, t }: AssistantPageProps) {
           role="switch"
           aria-checked={collab}
           className={css.memberChip}
-          disabled={secretary === undefined}
+          disabled={admin === undefined}
           title={t('assistant.collaborationHint')}
           onClick={() => { setCollab(value => !value) }}
         >

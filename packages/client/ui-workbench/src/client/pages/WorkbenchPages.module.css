@@ -74,8 +74,9 @@
 
 /* AI team */
 
-/* The roster is exactly the four company roles: 2×2 on narrower frames, one
-   row of four on full-width frames, so no ragged 3+1 row ever appears. */
+/* The roster is exactly the six company roles: three rows of two on narrower
+   frames, two rows of three on full-width frames, so no ragged final row ever
+   appears. */
 .memberGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -84,74 +85,162 @@
 
 @media (min-width: 1400px) {
   .memberGrid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    max-width: 1240px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-width: 1160px;
     margin-inline: auto;
   }
 }
 
-.memberCard {
+/* Each role card enlarges into a mini workbench: the member identity head
+   (still starts a session), the clients-read pending line, and the preset
+   one-click actions. The card is a plain div; the head and the action
+   buttons stay real buttons. */
+
+.workbenchCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 15px 16px 14px;
+  border: 1px solid #f2e6f0;
+  border-radius: 16px;
+  background: linear-gradient(162deg, #fdf3f9 0%, #faf2fc 100%);
+}
+
+.workbenchHead {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 16px;
-  border: 1px solid var(--dsh-border, #f0e6f8);
-  border-radius: 14px;
-  background: var(--dsh-surface, linear-gradient(160deg, #fdfaff 0%, #f8f1fe 100%));
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
   color: inherit;
   font-family: inherit;
   font-size: 14px;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
-.memberCard:hover:not(:disabled) {
-  border-color: var(--dsh-accent, #b478e8);
-  box-shadow: 0 6px 18px rgba(180, 120, 232, 0.16);
-  transform: translateY(-1px);
-}
-
-.memberCard:disabled {
+.workbenchHead:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
-.memberHead {
+.head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
-.memberIcon {
+.icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 10px;
+  background: #fbeaf3;
+  font-size: 20px;
+  line-height: 1;
+}
+
+/* Role-less presets keep the shared preset glyph on the neutral tile. */
+.workbenchCard[data-role='generic'] .icon {
   background: var(--dsh-accent-soft, #f3eafd);
   color: var(--dsh-accent, #9a5cd6);
+  font-size: 18px;
 }
 
-.memberDot {
-  margin-top: 4px;
+.dot {
+  margin-top: 3px;
 }
 
-.memberName {
-  font-size: 15px;
+.busy {
+  margin-top: 1px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  corner-shape: round;
+  background: #fbeaf3;
+  color: #c2508f;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.name {
+  font-size: 16px;
   font-weight: 700;
+  color: #2a2230;
 }
 
-.memberDesc {
-  font-size: 12px;
+.desc {
+  font-size: 12.5px;
   line-height: 1.5;
-  color: var(--dsh-fg-muted, #8a8f99);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  color: #9a8fa3;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  margin-top: 5px;
+  overflow: hidden;
+}
+
+.tag {
+  flex: none;
+  padding: 2px 9px;
+  border-radius: 6px;
+  background: #f4edf5;
+  color: #6f6478;
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.pending {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(180, 120, 232, 0.08);
+  color: #8a4fae;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.action {
+  padding: 6px 12px;
+  border: 1px solid #e8d8ef;
+  border-radius: 999px;
+  corner-shape: round;
+  background: #ffffff;
+  color: #7a4a9e;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.action:hover:not(:disabled) {
+  border-color: #b478e8;
+  background: #fbf3ff;
+}
+
+.action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 /* Task assistant */
@@ -230,6 +319,13 @@
   color: var(--dsh-fg-muted, #8a8f99);
 }
 
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
 .submitRow {
   display: flex;
   justify-content: flex-end;
@@ -262,6 +358,43 @@
 .metricLabel {
   font-size: 12px;
   color: var(--dsh-fg-muted, #8a8f99);
+}
+
+.reportControls {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.reportControls .field {
+  max-width: 220px;
+}
+
+.sectionSubtitle {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.healthList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.healthRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--dsh-border, #eceef2);
+  border-radius: 12px;
+  background: var(--dsh-surface, #ffffff);
+  font-size: 14px;
 }
 
 .section {

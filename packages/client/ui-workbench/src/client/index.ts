@@ -131,6 +131,9 @@ export function apply(ctx: ClientContext): void {
   // The sidebar nav, the frame-wide page surface, and the hero dashboard share
   // the controller above, so a nav entry and a hero shortcut open the same page.
   ctx.inject(['slots', 'conversation', 'sessions', 'uiWorkspace', 'layout'], (scope: ClientContext) => {
+    // Conversation work mode: a session switch from any surface folds an open
+    // workbench page back to the conversation.
+    controller.watchSessionSwitch()
     // Rows are cached between Session-list snapshots; the hook must be built
     // once so that stable reference survives every render.
     const useTasks = createTaskRowsHook(scope)
@@ -158,6 +161,10 @@ export function apply(ctx: ClientContext): void {
       loadMembers: () => controller.loadMembers(),
       loadClients: () => controller.loadClients(),
       close: () => { controller.closePage() },
+      startTask: () => {
+        controller.closePage()
+        controller.startTask()
+      },
       openSession: (id) => { controller.openSession(id) },
       startWithPreset: (id: string) => { controller.startWithPreset(id) },
       assignTask: (presetId, brief) => { controller.assignTask(presetId, brief) },
@@ -175,6 +182,7 @@ export function apply(ctx: ClientContext): void {
       markDelivery: (id, status) => controller.markDelivery(id, status),
       removeDelivery: id => controller.removeDelivery(id),
       recordFollowUp: payload => controller.recordFollowUp(payload),
+      setReportMonth: month => controller.setReportMonth(month),
     })
 
     scope.effect(() => {

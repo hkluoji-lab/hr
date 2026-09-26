@@ -1,10 +1,11 @@
 /**
  * The secretary-company clients page (stage-1 SOP): the follow-up center
  * (S-FOLLOW-01), the client master (S-CORE-01), the statutory-filing
- * obligation ledger (S-COMPL-01), the current year's filing schedule, and the
- * signature-delivery ledger (S-DELIV-01). Every read and write goes through
- * the host workbench Remote; the page only validates field presence locally
- * and maps the host's wire error codes to friendly copy.
+ * obligation ledger (S-COMPL-01), the current year's filing schedule, the
+ * signature-delivery ledger (S-DELIV-01), and the business monthly report
+ * (S-RPT-01). Every read and write goes through the host workbench Remote; the
+ * page only validates field presence locally and maps the host's wire error
+ * codes to friendly copy.
  *
  * The follow-up center folds open deliveries past their chase rung and open
  * obligations inside a reminder rung into one queue, most urgent rung first;
@@ -15,7 +16,9 @@
  * yet, so the page never derives dates the host already decided. Reminder
  * tiers (d30/d15/d7/d1/overdue) render as badges beside each due date, and
  * delivery rows carry the follow-up ladder (nudge T+3 / chase T+7 / escalate
- * T+14) the 催办 workflow acts on.
+ * T+14) the 催办 workflow acts on. The monthly report reads the host's
+ * aggregation for the selected month — tallies beside the live per-client
+ * health fold — so the page never recomputes what the host already decided.
  */
 import { useState, type ReactNode } from 'react'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -51,6 +54,8 @@ export interface ClientsPageProps {
   onRemoveDelivery: (id: string) => Promise<MutationOutcome>
   /** Log one follow-up reminder against an open target. */
   onRecordFollowUp: (payload: WorkbenchFollowUpCreate) => Promise<MutationOutcome>
+  /** Switch the monthly report's month and re-read the page. */
+  onSetReportMonth: (month: string) => Promise<void>
   /** Namespace-bound translate. */
   t: TranslateNS<'workbench'>
 }
@@ -112,12 +117,13 @@ const NEXT_STEP: Record<WorkbenchDeliveryStatus, { next: WorkbenchDeliveryStatus
  * @param props - the snapshot plus the follow-up, master, ledger, and
  *   delivery actions.
  * @returns the follow-up center, the schedule, the client master with its
- *   creation form, the obligation ledger with its recording form, and the
- *   signature-delivery ledger with its recording form.
+ *   creation form, the obligation ledger with its recording form, the
+ *   signature-delivery ledger with its recording form, and the monthly report
+ *   with its month picker.
  */
 export function ClientsPage({
   clients, onAddClient, onRemoveClient, onAddObligation, onMarkObligation, onRemoveObligation,
-  onAddDelivery, onMarkDelivery, onRemoveDelivery, onRecordFollowUp, t,
+  onAddDelivery, onMarkDelivery, onRemoveDelivery, onRecordFollowUp, onSetReportMonth, t,
 }: ClientsPageProps) {
   const [nameCn, setNameCn] = useState('')
   const [nameEn, setNameEn] = useState('')
@@ -615,7 +621,94 @@ export function ClientsPage({
         </div>
         {deliveryError !== null && <p className={css.formError} role="alert">{deliveryError}</p>}
       </section>
+
+      <section className={css.section}>
+        <h3 className={css.sectionTitle}>{t('clients.report.title')}</h3>
+        {clients.status !== 'ready'
+          ? (
+            <p className={css.empty}>
+              {clients.status === 'error'
+                ? t('clients.read.error', { message: clients.error ?? '' })
+                : t('clients.read.loading')}
+            </p>
+          )
+          : clients.report === null
+            ? <p className={css.empty}>{t('clients.report.empty')}</p>
+            : (
+              <>
+                <div className={css.reportControls}>
+                  <label className={css.field}>
+                    {t('clients.report.month')}
+                    <input
+                      type="month"
+                      value={clients.reportMonth}
+                      onChange={(event) => { void onSetReportMonth(event.target.value) }}
+                      className={css.phoneInput}
+                    />
+                  </label>
+                </div>
+                <div className={css.metrics}>
+                  <Metric value={clients.report.clients.total} label={t('clients.report.metrics.clients.total')} />
+                  <Metric value={clients.report.clients.newInMonth} label={t('clients.report.metrics.clients.new')} />
+                  <Metric
+                    value={clients.report.obligations.recordedInMonth}
+                    label={t('clients.report.metrics.obligations.recorded')}
+                  />
+                  <Metric value={clients.report.obligations.open} label={t('clients.report.metrics.obligations.open')} />
+                  <Metric
+                    value={clients.report.obligations.overdue}
+                    label={t('clients.report.metrics.obligations.overdue')}
+                  />
+                  <Metric value={clients.report.deliveries.sent} label={t('clients.report.metrics.deliveries.sent')} />
+                  <Metric value={clients.report.deliveries.signed} label={t('clients.report.metrics.deliveries.signed')} />
+                  <Metric value={clients.report.deliveries.open} label={t('clients.report.metrics.deliveries.open')} />
+                  <Metric value={clients.report.reminders.total} label={t('clients.report.metrics.reminders.total')} />
+                </div>
+                <h4 className={css.sectionSubtitle}>{t('clients.report.health.title')}</h4>
+                {clients.report.health.length === 0
+                  ? <p className={css.empty}>{t('clients.report.health.empty')}</p>
+                  : (
+                    <ul className={css.healthList}>
+                      {clients.report.health.map(health => (
+                        <li key={health.clientId} className={css.healthRow}>
+                          <span className={css.clientName}>{health.clientNameCn}</span>
+                          <span className={`${css.badge} ${css[health.health]}`}>
+                            {t(`clients.compliance.${health.health}`)}
+                          </span>
+                          <span className={css.clientMeta}>
+                            {t('clients.report.health.openFilings', { n: health.openFilings })}
+                          </span>
+                          <span className={css.clientMeta}>
+                            {t('clients.report.health.overdueFilings', { n: health.overdueFilings })}
+                          </span>
+                          <span className={css.clientMeta}>
+                            {t('clients.report.health.chasingDeliveries', { n: health.chasingDeliveries })}
+                          </span>
+                          <span className={css.clientMeta}>
+                            {t('clients.report.health.reminders', { n: health.remindersInMonth })}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+              </>
+            )}
+      </section>
     </>
+  )
+}
+
+/**
+ * One tallied figure of the monthly report: the number above its label.
+ * @param props - the value and its label.
+ * @returns the metric card element.
+ */
+function Metric({ value, label }: { value: number; label: string }) {
+  return (
+    <div className={css.metric}>
+      <span className={css.metricValue}>{value}</span>
+      <span className={css.metricLabel}>{label}</span>
+    </div>
   )
 }
 

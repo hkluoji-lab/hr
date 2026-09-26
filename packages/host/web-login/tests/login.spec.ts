@@ -584,7 +584,7 @@ describe('member invites and roster', () => {
     const anonymousList = await fetch(`${base}/team/members`)
     expect(anonymousList.status).toBe(401)
     expect(await anonymousList.json()).toEqual({ code: 'unauthenticated', message: 'log in first' })
-    expect((await post(base, '/team/invites', '{"roles":["accountant"]}')).status).toBe(401)
+    expect((await post(base, '/team/invites', '{"roles":["finance"]}')).status).toBe(401)
     expect((await fetch(`${base}/team/members/${MEMBER}`, { method: 'DELETE' })).status).toBe(401)
 
     // A logged-in non-owner manages nothing (OWNER registered first is the owner).
@@ -592,7 +592,7 @@ describe('member invites and roster', () => {
     await register(base, MEMBER)
     trust.subject = MEMBER
     expect((await fetch(`${base}/team/members`)).status).toBe(403)
-    expect((await post(base, '/team/invites', '{"roles":["accountant"]}')).status).toBe(403)
+    expect((await post(base, '/team/invites', '{"roles":["finance"]}')).status).toBe(403)
     expect((await fetch(`${base}/team/members/${OWNER}`, { method: 'DELETE' })).status).toBe(403)
   })
 
@@ -602,7 +602,7 @@ describe('member invites and roster', () => {
     await register(base, MEMBER)
 
     trust.subject = OWNER
-    const created = await post(base, '/team/invites', JSON.stringify({ roles: ['accountant'] }))
+    const created = await post(base, '/team/invites', JSON.stringify({ roles: ['finance'] }))
     expect(created.status).toBe(200)
     const invite = await created.json() as { ok: true; code: string; expiresAt: number }
     expect(invite.ok).toBe(true)
@@ -611,18 +611,18 @@ describe('member invites and roster', () => {
     // The invite persisted with its roles beside the accounts.
     const stored = await readFile(join(storageRoot!, 'web_login.json'), 'utf8')
     expect(stored).toContain(invite.code)
-    expect(stored).toContain('accountant')
+    expect(stored).toContain('finance')
 
     // Redemption always binds the session subject.
     trust.subject = MEMBER
     const redeemed = await post(base, '/team/invites/redeem', JSON.stringify({ code: invite.code }))
     expect(redeemed.status).toBe(200)
-    expect(await redeemed.json()).toEqual({ ok: true, roles: ['accountant'] })
+    expect(await redeemed.json()).toEqual({ ok: true, roles: ['finance'] })
     expect(await (await fetch(`${base}/auth/status`)).json()).toEqual({
       authenticated: true,
       subject: MEMBER,
       displayName: '139****5678',
-      roles: ['accountant'],
+      roles: ['finance'],
     })
 
     // An invite is single use; unknown codes are refused before any write.
@@ -638,8 +638,8 @@ describe('member invites and roster', () => {
     trust.subject = OWNER
     expect((await post(base, '/team/invites', '{"roles":[]}')).status).toBe(400)
     expect((await post(base, '/team/invites', '{"roles":["boss"]}')).status).toBe(400)
-    expect((await post(base, '/team/invites', '{"roles":["secretary","secretary"]}')).status).toBe(400)
-    expect((await post(base, '/team/invites', '{"roles":"accountant"}')).status).toBe(400)
+    expect((await post(base, '/team/invites', '{"roles":["admin","admin"]}')).status).toBe(400)
+    expect((await post(base, '/team/invites', '{"roles":"finance"}')).status).toBe(400)
     expect((await post(base, '/team/invites', '{}')).status).toBe(400)
   })
 
@@ -671,11 +671,11 @@ describe('member invites and roster', () => {
       trust.subject = MEMBER
       return post(base, '/team/invites/redeem', JSON.stringify({ code }))
     }
-    expect((await redeem(await createCode(['accountant']))).status).toBe(200)
-    expect(await (await redeem(await createCode(['legal', 'audit']))).json())
-      .toEqual({ ok: true, roles: ['accountant', 'legal', 'audit'] })
+    expect((await redeem(await createCode(['finance']))).status).toBe(200)
+    expect(await (await redeem(await createCode(['legal', 'marketing']))).json())
+      .toEqual({ ok: true, roles: ['finance', 'legal', 'marketing'] })
     const status = await (await fetch(`${base}/auth/status`)).json() as { roles: string[] }
-    expect(status.roles).toEqual(['accountant', 'legal', 'audit'])
+    expect(status.roles).toEqual(['finance', 'legal', 'marketing'])
   })
 
   it('lists the roster for the owner only, with grant facts', async () => {
@@ -683,7 +683,7 @@ describe('member invites and roster', () => {
     await register(base, OWNER)
     await register(base, MEMBER)
     trust.subject = OWNER
-    const created = await post(base, '/team/invites', JSON.stringify({ roles: ['accountant'] }))
+    const created = await post(base, '/team/invites', JSON.stringify({ roles: ['finance'] }))
     trust.subject = MEMBER
     await post(base, '/team/invites/redeem', JSON.stringify({ code: (await created.json() as { code: string }).code }))
 
@@ -700,7 +700,7 @@ describe('member invites and roster', () => {
     expect(roster.members).toEqual([{
       phone: MEMBER,
       displayName: '139****5678',
-      roles: ['accountant'],
+      roles: ['finance'],
       grantedBy: '138****1234',
       grantedAt: roster.members[0]?.grantedAt,
     }])
@@ -711,7 +711,7 @@ describe('member invites and roster', () => {
     await register(base, OWNER)
     await register(base, MEMBER)
     trust.subject = OWNER
-    const created = await post(base, '/team/invites', JSON.stringify({ roles: ['accountant'] }))
+    const created = await post(base, '/team/invites', JSON.stringify({ roles: ['finance'] }))
     trust.subject = MEMBER
     await post(base, '/team/invites/redeem', JSON.stringify({ code: (await created.json() as { code: string }).code }))
 
@@ -753,22 +753,22 @@ describe('member invites and roster', () => {
 
     // Seed one role through the invite flow, then replace it directly.
     trust.subject = OWNER
-    const created = await post(base, '/team/invites', JSON.stringify({ roles: ['accountant'] }))
+    const created = await post(base, '/team/invites', JSON.stringify({ roles: ['finance'] }))
     trust.subject = MEMBER
     await post(base, '/team/invites/redeem', JSON.stringify({ code: (await created.json() as { code: string }).code }))
 
     trust.subject = OWNER
-    const assigned = await put(base, MEMBER, JSON.stringify({ roles: ['legal', 'audit'] }))
+    const assigned = await put(base, MEMBER, JSON.stringify({ roles: ['legal', 'marketing'] }))
     expect(assigned.status).toBe(200)
-    expect(await assigned.json()).toEqual({ ok: true, phone: MEMBER, roles: ['legal', 'audit'] })
+    expect(await assigned.json()).toEqual({ ok: true, phone: MEMBER, roles: ['legal', 'marketing'] })
 
-    // Replacement, not union: the earlier accountant binding is gone.
+    // Replacement, not union: the earlier finance binding is gone.
     trust.subject = MEMBER
     expect(await (await fetch(`${base}/auth/status`)).json()).toEqual({
       authenticated: true,
       subject: MEMBER,
       displayName: '139****5678',
-      roles: ['legal', 'audit'],
+      roles: ['legal', 'marketing'],
     })
 
     // The roster shows the fresh grant facts from the direct assignment.
@@ -777,7 +777,7 @@ describe('member invites and roster', () => {
       members: { roles: string[]; grantedBy: string }[]
     }
     expect(roster.members).toHaveLength(1)
-    expect(roster.members[0]?.roles).toEqual(['legal', 'audit'])
+    expect(roster.members[0]?.roles).toEqual(['legal', 'marketing'])
     expect(roster.members[0]?.grantedBy).toBe('138****1234')
   })
 
@@ -787,18 +787,18 @@ describe('member invites and roster', () => {
     await register(base, MEMBER)
 
     // Anonymous and non-owner callers are refused before anything else.
-    expect((await put(base, MEMBER, '{"roles":["accountant"]}')).status).toBe(401)
+    expect((await put(base, MEMBER, '{"roles":["finance"]}')).status).toBe(401)
     trust.subject = MEMBER
-    expect((await put(base, MEMBER, '{"roles":["accountant"]}')).status).toBe(403)
+    expect((await put(base, MEMBER, '{"roles":["finance"]}')).status).toBe(403)
 
     trust.subject = OWNER
-    expect((await put(base, 'not-a-phone', '{"roles":["accountant"]}')).status).toBe(400)
+    expect((await put(base, 'not-a-phone', '{"roles":["finance"]}')).status).toBe(400)
     expect((await put(base, MEMBER, '{"roles":[]}')).status).toBe(400)
     expect((await put(base, MEMBER, '{"roles":["boss"]}')).status).toBe(400)
     // The owner's binding is implicit in ownership itself, like the unbind refusal.
-    expect((await put(base, OWNER, '{"roles":["accountant"]}')).status).toBe(403)
+    expect((await put(base, OWNER, '{"roles":["finance"]}')).status).toBe(403)
     // Assignment targets registered accounts only, so a typo cannot mint a member.
-    const missing = await put(base, '13700009999', '{"roles":["accountant"]}')
+    const missing = await put(base, '13700009999', '{"roles":["finance"]}')
     expect(missing.status).toBe(400)
     expect(await missing.json()).toEqual({ code: 'no-account', message: 'this phone is not registered' })
   })
@@ -841,7 +841,7 @@ describe('member invites and roster', () => {
     await registerWithPassword(base, OWNER, 'secret123')
     await registerWithPassword(base, MEMBER, 'secret123')
     trust.subject = OWNER
-    await put(base, MEMBER, JSON.stringify({ roles: ['accountant'] }))
+    await put(base, MEMBER, JSON.stringify({ roles: ['finance'] }))
 
     const remove = (phone: string, method = 'DELETE'): Promise<Response> =>
       fetch(`${base}/team/accounts/${encodeURIComponent(phone)}`, { method })

@@ -19,7 +19,7 @@ export interface DemoProgress {
 
 /** The three progress rows in design order. */
 export const DEMO_PROGRESS: readonly DemoProgress[] = [
-  { labelKey: 'right.progress.secretary', percent: 60 },
+  { labelKey: 'right.progress.admin', percent: 60 },
   { labelKey: 'right.progress.finance', percent: 30 },
   { labelKey: 'right.progress.legal', percent: 90 },
 ]

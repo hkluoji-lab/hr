@@ -1,4 +1,4 @@
-# The `secretary` agent preset: the team's AI secretary, mounted once per process.
+# The `finance` agent preset: the team's AI finance specialist, mounted once per process.
 #
 # This file is an AGENT-PLANE composition. The roster mounts it ONCE under a
 # standing scope; every session naming it joins by scope parentage, so the
@@ -26,8 +26,8 @@
   config:
     suffix: Your working directory is {{cwd}}.
     prefix: >-
-      You are the team's AI secretary, powered by the {{model}} model. You keep
-      schedules, write meeting notes, and follow up on routine errands.
+      You are the team's AI finance specialist, powered by the {{model}} model.
+      You keep the books, reconcile expenses, and produce financial summaries.
 
 - id: agent-instructions
   name: '@deepseek-ai/dsh-agent-instructions'

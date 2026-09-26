@@ -14,7 +14,7 @@ import { defineDomain, domainTable, type DomainTableSpec } from '@deepseek-ai/ds
  * workbench's role vocabulary (`ui-workbench` roles.ts); `owner` is not a
  * member role — it is derived from the earliest registered account.
  */
-export const ROLE_IDS = ['secretary', 'accountant', 'legal', 'audit'] as const
+export const ROLE_IDS = ['recruiting', 'finance', 'legal', 'financing', 'admin', 'marketing'] as const
 
 /** One AI-company role id. */
 export type RoleId = (typeof ROLE_IDS)[number]

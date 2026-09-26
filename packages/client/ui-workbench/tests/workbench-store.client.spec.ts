@@ -9,8 +9,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentPresetRoster } from '@deepseek-ai/dsh-agent-presets/types'
 import {
-  WorkbenchController, memberDotState, taskCounts, scopedMembers, scopedRoles,
-  type TeamMember,
+  WorkbenchController, memberDotState, rolePending, taskCounts, scopedMembers, scopedRoles,
+  type ClientsState, type TeamMember,
 } from '../src/client/workbench-store.ts'
 import { ROLES } from '../src/client/roles.ts'
 
@@ -131,7 +131,7 @@ function makeCtx(
       toggleSidebar: () => { calls.push('toggleSidebar') },
     },
   }
-  return { ctx, calls, fetcher, notify: () => { for (const fn of listeners) fn() } }
+  return { ctx, calls, fetcher, state, notify: () => { for (const fn of listeners) fn() } }
 }
 
 describe('WorkbenchController roster derivation', () => {
@@ -175,7 +175,7 @@ describe('WorkbenchController roster derivation', () => {
     const bench = makeCtx({
       ok: true,
       value: roster([
-        { id: 'sec', trust: 'system', isDefault: false, name: 'AI 秘书' },
+        { id: 'rec', trust: 'system', isDefault: false, name: 'AI 招聘' },
         { id: 'standard', trust: 'system', isDefault: true, name: '标准模式' },
       ]),
     }, { current: undefined, byId: {} })
@@ -185,7 +185,7 @@ describe('WorkbenchController roster derivation', () => {
     const byId = Object.fromEntries(
       controller.store.getSnapshot().members.map(member => [member.id, member.role?.id]))
 
-    expect(byId).toEqual({ sec: 'secretary', standard: undefined })
+    expect(byId).toEqual({ rec: 'recruiting', standard: undefined })
   })
 
   it('marks a preset busy when a live non-blank session runs it', async () => {
@@ -329,6 +329,41 @@ describe('memberDotState', () => {
     expect(memberDotState('online')).toBe('done')
     expect(memberDotState('busy')).toBe('ongoing')
     expect(memberDotState('offline')).toBe('idle')
+  })
+})
+
+describe('rolePending', () => {
+  /** Clients data answering each role's fold: 1 chase, 2 to file, 1 closing in. */
+  const CLIENTS: ClientsState = {
+    status: 'ready', error: null, clients: [], deliveries: [],
+    obligations: [
+      { id: 'o1', clientId: 'C-1', clientNameCn: '甲公司', kind: 'NAR1', periodLabel: '2026', dueDate: '2026-03-15', status: 'open', createdAt: 1, daysUntilDue: 5, dueTier: 'd1' },
+      { id: 'o2', clientId: 'C-2', clientNameCn: '乙公司', kind: 'ITR', periodLabel: '2026', dueDate: '2026-06-01', status: 'open', createdAt: 1, daysUntilDue: 40, dueTier: 'ok' },
+      { id: 'o3', clientId: 'C-2', clientNameCn: '乙公司', kind: 'PTR', periodLabel: '2025', dueDate: '2025-12-31', status: 'submitted', createdAt: 1, daysUntilDue: -80, dueTier: 'overdue' },
+    ],
+    schedule: {
+      year: '2026',
+      rows: [{ clientId: 'C-1', clientNameCn: '甲公司', kind: 'NAR1', periodLabel: '2026', dueDate: '2026-03-15', status: 'open', source: 'ledger', dueTier: 'd1' }],
+    },
+    followUps: [{
+      id: 'delivery:d1', targetKind: 'delivery', targetId: 'd1', clientId: 'C-1',
+      clientNameCn: '甲公司', title: '年报套装', tier: 'chase', suggestedChannel: 'wechat',
+      days: 7, message: '催办话术', reminderCount: 1,
+    }],
+    reportMonth: '2026-09', report: null,
+  }
+
+  it('folds the admin chase, the finance filing, and the legal due-soon counts', () => {
+    expect(rolePending(CLIENTS, 'admin')).toEqual({ count: 1, labelKey: 'team.pending.chase' })
+    expect(rolePending(CLIENTS, 'finance')).toEqual({ count: 2, labelKey: 'team.pending.file' })
+    // The submitted obligation and the far-out open one stay out of legal's lane.
+    expect(rolePending(CLIENTS, 'legal')).toEqual({ count: 1, labelKey: 'team.pending.due' })
+  })
+
+  it('reads null for the roles with no clients-data backlog', () => {
+    expect(rolePending(CLIENTS, 'recruiting')).toBeNull()
+    expect(rolePending(CLIENTS, 'financing')).toBeNull()
+    expect(rolePending(CLIENTS, 'marketing')).toBeNull()
   })
 })
 
@@ -559,13 +594,51 @@ describe('WorkbenchController actions', () => {
   })
 })
 
+describe('session-switch watcher', () => {
+  it('folds the open page when the current session changes from any surface', () => {
+    const bench = makeCtx({ ok: true, value: roster([]) }, { current: 's1', byId: {} })
+    const controller = new WorkbenchController(bench.ctx as never, bench.fetcher)
+    controller.watchSessionSwitch()
+
+    controller.openPage('clients')
+    expect(controller.pages.getSnapshot().open).toBe('clients')
+
+    bench.state.current = 's2'
+    bench.notify()
+    expect(controller.pages.getSnapshot().open).toBeNull()
+  })
+
+  it('keeps the page open while the current session holds, row updates included', () => {
+    const bench = makeCtx({ ok: true, value: roster([]) }, { current: 's1', byId: {} })
+    const controller = new WorkbenchController(bench.ctx as never, bench.fetcher)
+    controller.watchSessionSwitch()
+    controller.openPage('hall')
+
+    bench.notify()
+    expect(controller.pages.getSnapshot().open).toBe('hall')
+  })
+
+  it('closes again when the selection returns to a session later on', () => {
+    const bench = makeCtx({ ok: true, value: roster([]) }, { current: 's1', byId: {} })
+    const controller = new WorkbenchController(bench.ctx as never, bench.fetcher)
+    controller.watchSessionSwitch()
+
+    bench.state.current = 's2'
+    bench.notify()
+    controller.openPage('report')
+    bench.state.current = 's1'
+    bench.notify()
+    expect(controller.pages.getSnapshot().open).toBeNull()
+  })
+})
+
 describe('caller binding and workspace scoping', () => {
-  /** Roster mixing the three company roles with role-less presets. */
+  /** Roster mixing the company roles with role-less presets. */
   function teamRoster(): AgentPresetRoster {
     return roster([
       { id: 'standard', trust: 'system', isDefault: true, name: '标准模式' },
-      { id: 'sec', trust: 'system', isDefault: false, name: 'AI 秘书' },
-      { id: 'acc', trust: 'system', isDefault: false, name: 'AI 会计' },
+      { id: 'rec', trust: 'system', isDefault: false, name: 'AI 招聘' },
+      { id: 'fin', trust: 'system', isDefault: false, name: 'AI 财务' },
       { id: 'legal', trust: 'system', isDefault: false, name: 'AI 法务' },
     ])
   }
@@ -581,27 +654,27 @@ describe('caller binding and workspace scoping', () => {
     const bench = makeCtx({ ok: true, value: teamRoster() }, { current: undefined, byId: {} }, 'unavailable', {
       fetcher: authFetch({
         authenticated: true, displayName: '张*三', subject: '13800138000',
-        roles: ['accountant', 'boss', 'audit'], isOwner: false,
+        roles: ['finance', 'boss', 'marketing'], isOwner: false,
       }),
     })
     const controller = new WorkbenchController(bench.ctx as never, bench.fetcher)
     await controller.load()
 
     expect(controller.store.getSnapshot().my).toEqual({
-      name: '张*三', roles: ['accountant', 'audit'], isOwner: false,
+      name: '张*三', roles: ['finance', 'marketing'], isOwner: false,
     })
   })
 
   it('scopes the roster to a bound member\'s roles plus the role-less presets', async () => {
     const bench = makeCtx({ ok: true, value: teamRoster() }, { current: undefined, byId: {} }, 'unavailable', {
-      fetcher: authFetch({ authenticated: true, roles: ['accountant'] }),
+      fetcher: authFetch({ authenticated: true, roles: ['finance'] }),
     })
     const controller = new WorkbenchController(bench.ctx as never, bench.fetcher)
     await controller.load()
     const snapshot = controller.store.getSnapshot()
 
     // '标准模式' stays common workspace; the other roles drop out.
-    expect(snapshot.members.map(member => member.id)).toEqual(['standard', 'acc'])
+    expect(snapshot.members.map(member => member.id)).toEqual(['standard', 'fin'])
     expect(snapshot).toMatchObject({ online: 1, busy: 0, offline: 0 })
   })
 
@@ -633,32 +706,32 @@ describe('caller binding and workspace scoping', () => {
   })
 
   it('scopedMembers and scopedRoles share the owner/visitor/bound rule', () => {
-    const accountant: TeamMember = {
-      id: 'a', name: 'AI 会计', description: '', state: 'online', role: ROLES[1],
+    const finance: TeamMember = {
+      id: 'a', name: 'AI 财务', description: '', state: 'online', role: ROLES[1],
     }
-    const secretary: TeamMember = {
-      id: 'b', name: 'AI 秘书', description: '', state: 'online', role: ROLES[0],
+    const admin: TeamMember = {
+      id: 'b', name: 'AI 行政', description: '', state: 'online', role: ROLES[4],
     }
     const common: TeamMember = {
       id: 'c', name: '标准模式', description: '', state: 'online', role: undefined,
     }
-    const members = [accountant, secretary, common]
-    const bound = { name: null, roles: ['accountant'] as const, isOwner: false }
+    const members = [finance, admin, common]
+    const bound = { name: null, roles: ['finance'] as const, isOwner: false }
 
     expect(scopedMembers(members, { ...bound, isOwner: true }).map(member => member.id)).toEqual(['a', 'b', 'c'])
     expect(scopedMembers(members, { name: null, roles: [], isOwner: false }).map(member => member.id))
       .toEqual(['a', 'b', 'c'])
     expect(scopedMembers(members, bound).map(member => member.id)).toEqual(['a', 'c'])
 
-    expect(scopedRoles({ name: null, roles: [], isOwner: true })).toHaveLength(4)
-    expect(scopedRoles({ name: null, roles: [], isOwner: false })).toHaveLength(4)
-    expect(scopedRoles(bound).map(role => role.id)).toEqual(['accountant'])
+    expect(scopedRoles({ name: null, roles: [], isOwner: true })).toHaveLength(6)
+    expect(scopedRoles({ name: null, roles: [], isOwner: false })).toHaveLength(6)
+    expect(scopedRoles(bound).map(role => role.id)).toEqual(['finance'])
   })
 })
 
 describe('members management round trips', () => {
   const ENTRY = {
-    phone: '13800138000', displayName: '138****8000', roles: ['accountant'],
+    phone: '13800138000', displayName: '138****8000', roles: ['finance'],
     grantedBy: '139****9000', grantedAt: 1,
   }
   const ACCOUNT = {
@@ -711,7 +784,7 @@ describe('members management round trips', () => {
     })
     const controller = new WorkbenchController(bench.ctx as never, bench.fetcher)
 
-    await expect(controller.createInvite(['accountant'])).resolves.toEqual({ ok: true, code: 'AB_cd12', expiresAt: 99 })
+    await expect(controller.createInvite(['finance'])).resolves.toEqual({ ok: true, code: 'AB_cd12', expiresAt: 99 })
     expect(calls).toEqual(['POST /team/invites'])
 
     const refused = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
@@ -745,14 +818,14 @@ describe('members management round trips', () => {
     })
     const controller = new WorkbenchController(bench.ctx as never, bench.fetcher)
 
-    await expect(controller.assignMember('13800138000', ['legal', 'audit'])).resolves.toBeNull()
+    await expect(controller.assignMember('13800138000', ['legal', 'marketing'])).resolves.toBeNull()
     expect(calls).toEqual(['PUT /team/members/13800138000', 'GET /team/members', 'GET /team/accounts'])
 
     const refused = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
       fetcher: fetchReply([], () => ({ status: 400, body: { code: 'no-account', message: 'this phone is not registered' } })),
     })
     const refusedController = new WorkbenchController(refused.ctx as never, refused.fetcher)
-    await expect(refusedController.assignMember('13700009999', ['accountant']))
+    await expect(refusedController.assignMember('13700009999', ['finance']))
       .resolves.toBe('this phone is not registered')
   })
 
@@ -804,14 +877,29 @@ describe('clients-page round trips', () => {
     suggestedChannel: 'wechat' as const, days: 7, message: '催办话术', reminderCount: 0,
   }
 
-  /** Workbench remote doubles answering the quintuple the clients page reads. */
+  /** One monthly report shaped like the host read; the empty deployment's zeros. */
+  const REPORT = {
+    month: '2026-09',
+    clients: { total: 0, newInMonth: 0 },
+    obligations: { recordedInMonth: 0, open: 0, overdue: 0 },
+    deliveries: { sent: 0, signed: 0, returned: 0, open: 0 },
+    reminders: {
+      total: 0,
+      byChannel: { email: 0, wechat: 0, whatsapp: 0 },
+      byTier: { nudge: 0, chase: 0, escalate: 0, d30: 0, d15: 0, d7: 0, d1: 0, overdue: 0 },
+    },
+    health: [],
+  }
+
+  /** Workbench remote doubles answering the sextuple the clients page reads. */
   function clientsWorkbench(over: {
     clients?: unknown
     obligations?: unknown
     schedule?: unknown
     deliveries?: unknown
     followUps?: unknown
-  } = {}): Record<string, () => Promise<unknown>> {
+    report?: unknown
+  } = {}): Record<string, (...args: never[]) => Promise<unknown>> {
     return {
       clients: () => Promise.resolve({ ok: true as const, value: { clients: over.clients ?? [CLIENT] } }),
       obligations: () => Promise.resolve({ ok: true as const, value: { obligations: over.obligations ?? [OBLIGATION] } }),
@@ -821,10 +909,15 @@ describe('clients-page round trips', () => {
       }),
       deliveries: () => Promise.resolve({ ok: true as const, value: { deliveries: over.deliveries ?? [] } }),
       followUps: () => Promise.resolve({ ok: true as const, value: { followUps: over.followUps ?? [] } }),
+      // The report echoes the requested month, so a switch is observable.
+      monthlyReport: (month?: never) => Promise.resolve({
+        ok: true as const,
+        value: month === undefined ? REPORT : { ...REPORT, month },
+      }),
     }
   }
 
-  it('reads the master, the ledger, the schedule, the deliveries, and the follow-up center into the clients snapshot', async () => {
+  it('reads the master, the ledger, the schedule, the deliveries, the follow-up center, and the report into the clients snapshot', async () => {
     const bench = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
       workbench: clientsWorkbench({ deliveries: [DELIVERY], followUps: [FOLLOW_UP] }),
     })
@@ -833,15 +926,28 @@ describe('clients-page round trips', () => {
 
     expect(controller.clients.getSnapshot()).toMatchObject({
       status: 'ready', error: null, clients: [CLIENT], obligations: [OBLIGATION],
-      deliveries: [DELIVERY], followUps: [FOLLOW_UP],
+      deliveries: [DELIVERY], followUps: [FOLLOW_UP], reportMonth: '2026-09',
     })
     expect(controller.clients.getSnapshot().schedule).toMatchObject({ year: '2026' })
     expect(bench.calls).toEqual([
-      'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps',
+      'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries',
+      'workbench.followUps', 'workbench.monthlyReport',
     ])
   })
 
-  it('fails the whole clients read when any of the five answers refuses', async () => {
+  it('switches the report month and re-reads the page for the new period', async () => {
+    const bench = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
+      workbench: clientsWorkbench(),
+    })
+    const controller = new WorkbenchController(bench.ctx as never, bench.fetcher)
+    await controller.loadClients()
+
+    await controller.setReportMonth('2026-08')
+    expect(controller.clients.getSnapshot().reportMonth).toBe('2026-08')
+    expect(bench.calls.filter(call => call === 'workbench.monthlyReport')).toHaveLength(2)
+  })
+
+  it('fails the whole clients read when any of the six answers refuses', async () => {
     const bench = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
       workbench: {
         ...clientsWorkbench(),
@@ -855,6 +961,19 @@ describe('clients-page round trips', () => {
     await controller.loadClients()
 
     expect(controller.clients.getSnapshot()).toMatchObject({ status: 'error', error: 'ledger boom' })
+
+    const reportFailed = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
+      workbench: {
+        ...clientsWorkbench(),
+        monthlyReport: () => Promise.resolve({
+          ok: false as const,
+          error: { code: 'gateway/bad-request', message: 'bad month' },
+        }),
+      },
+    })
+    const reportController = new WorkbenchController(reportFailed.ctx as never, reportFailed.fetcher)
+    await reportController.loadClients()
+    expect(reportController.clients.getSnapshot()).toMatchObject({ status: 'error', error: 'bad month' })
   })
 
   it('adds a client and refreshes the page from the host, surfacing refusals with the wire code', async () => {
@@ -870,7 +989,7 @@ describe('clients-page round trips', () => {
     await expect(controller.addClient(payload)).resolves.toEqual({ ok: true })
     expect(bench.calls).toEqual([
       'workbench.addClient',
-      'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps',
+      'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps', 'workbench.monthlyReport',
     ])
 
     const refused = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
@@ -909,10 +1028,10 @@ describe('clients-page round trips', () => {
     await expect(controller.removeClient('C-2026-0001')).resolves.toEqual({ ok: true })
 
     expect(bench.calls.filter(call => call.startsWith('workbench.'))).toEqual([
-      'workbench.addObligation', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps',
-      'workbench.markObligation', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps',
-      'workbench.removeObligation', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps',
-      'workbench.removeClient', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps',
+      'workbench.addObligation', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps', 'workbench.monthlyReport',
+      'workbench.markObligation', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps', 'workbench.monthlyReport',
+      'workbench.removeObligation', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps', 'workbench.monthlyReport',
+      'workbench.removeClient', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps', 'workbench.monthlyReport',
     ])
 
     const refused = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
@@ -947,9 +1066,9 @@ describe('clients-page round trips', () => {
     await expect(controller.removeDelivery('d1')).resolves.toEqual({ ok: true })
 
     expect(bench.calls.filter(call => call.startsWith('workbench.'))).toEqual([
-      'workbench.addDelivery', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps',
-      'workbench.markDelivery', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps',
-      'workbench.removeDelivery', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps',
+      'workbench.addDelivery', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps', 'workbench.monthlyReport',
+      'workbench.markDelivery', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps', 'workbench.monthlyReport',
+      'workbench.removeDelivery', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps', 'workbench.monthlyReport',
     ])
 
     const refused = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {
@@ -979,7 +1098,7 @@ describe('clients-page round trips', () => {
 
     await expect(controller.recordFollowUp({ targetKind: 'delivery', targetId: 'd1' })).resolves.toEqual({ ok: true })
     expect(bench.calls.filter(call => call.startsWith('workbench.'))).toEqual([
-      'workbench.recordFollowUp', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps',
+      'workbench.recordFollowUp', 'workbench.clients', 'workbench.obligations', 'workbench.complianceSchedule', 'workbench.deliveries', 'workbench.followUps', 'workbench.monthlyReport',
     ])
 
     const refused = makeCtx({ ok: true, value: roster([]) }, { current: undefined, byId: {} }, 'unavailable', {

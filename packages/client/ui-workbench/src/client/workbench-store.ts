@@ -16,7 +16,8 @@
  * frame (the sidebar nav toggles one), the bounded credits ledger the report
  * page reads, the owner's members-management data, and the secretary-company
  * client master with its statutory-filing ledger, the current year's
- * compliance schedule, and the signature-delivery ledger (the clients page).
+ * compliance schedule, the signature-delivery ledger, the follow-up center,
+ * and the business monthly report (the clients page).
  *
  * The logged-in caller's role binding arrives through one same-origin
  * `/auth/status` read (the host login surface's wire contract): owners and
@@ -40,7 +41,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {
   WorkbenchClient, WorkbenchClientCreate, WorkbenchCreditEntry, WorkbenchDelivery,
   WorkbenchDeliveryCreate, WorkbenchDeliveryStatus, WorkbenchFollowUp, WorkbenchFollowUpCreate,
-  WorkbenchObligation, WorkbenchObligationCreate, WorkbenchSchedule,
+  WorkbenchMonthlyReport, WorkbenchObligation, WorkbenchObligationCreate, WorkbenchSchedule,
 } from '@deepseek-ai/dsh-workbench/types'
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 // Wire contract of the host login surface: same-origin routes and payloads.
@@ -52,6 +53,7 @@ import {
   type MemberListEntry, type MemberListResult,
 } from '@deepseek-ai/dsh-web-login/shared'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
+import type { WorkbenchKey } from './locales.ts'
 import { ROLES, roleOf, type RoleId, type RoleMeta } from './roles.ts'
 
 /* jscpd:ignore-start -- each browser plugin owns its same-origin fetch carrier;
@@ -93,7 +95,7 @@ export interface TeamMember {
   description: string
   /** Live state derived from the roster and the session list. */
   state: TeamMemberState
-  /** Role presentation (emoji, scope, tags), for the four company presets. */
+  /** Role presentation (emoji, scope, tags), for the six company presets. */
   role: RoleMeta | undefined
 }
 
@@ -111,7 +113,7 @@ export interface MyStatus {
 const MY_VISITOR: MyStatus = { name: null, roles: [], isOwner: false }
 
 /**
- * Whether one role id is one of the workbench's four company roles.
+ * Whether one role id is one of the workbench's six company roles.
  * @param value - the raw role string from the auth payload.
  * @returns true when the value names a known role.
  */
@@ -143,7 +145,7 @@ export function scopedRoles(my: MyStatus): readonly RoleMeta[] {
 }
 
 /**
- * Order the roster for role display: the four company roles in their design
+ * Order the roster for role display: the six company roles in their design
  * order when the deployment composes them, otherwise every preset. The hero
  * dashboard and the team page present the same fold, so mode and other
  * non-role presets never appear as the company's team.
@@ -155,6 +157,45 @@ export function roleMembers(members: readonly TeamMember[]): readonly TeamMember
     .map(role => members.find(member => member.role?.id === role.id))
     .filter((member): member is TeamMember => member !== undefined)
   return roles.length > 0 ? roles : members
+}
+
+/** What one company role must act on next, folded from the clients-page data. */
+export interface RolePending {
+  /** Actionable rows the role should work next. */
+  count: number
+  /** Locale key of the pending line, filled with the count. */
+  labelKey: WorkbenchKey
+}
+
+/**
+ * Fold the clients-page data into what one company role must act on next:
+ * the admin chases the follow-up center's open rows, finance files open
+ * obligations, and the legal side watches the obligations closing in. The
+ * recruiting, fundraising, and marketing roles have no client-backed backlog,
+ * so they read null and the team page omits the line; a snapshot that is not
+ * ready (or a deployment without the workbench service) reads zero, so the
+ * team page gates the pending line on the read being ready.
+ * @param clients - the clients-page snapshot.
+ * @param roleId - the company role.
+ * @returns the pending count and its label key, or null when the role owns no
+ *   clients-data backlog.
+ */
+export function rolePending(clients: ClientsState, roleId: RoleId): RolePending | null {
+  switch (roleId) {
+    case 'admin':
+      return { count: clients.followUps.length, labelKey: 'team.pending.chase' }
+    case 'finance':
+      return { count: clients.obligations.filter(entry => entry.status === 'open').length, labelKey: 'team.pending.file' }
+    case 'legal':
+      return {
+        count: clients.obligations.filter(entry => entry.status === 'open' && entry.dueTier !== 'ok').length,
+        labelKey: 'team.pending.due',
+      }
+    case 'recruiting':
+    case 'financing':
+    case 'marketing':
+      return null
+  }
 }
 
 /** Workbench dashboard snapshot. */
@@ -257,8 +298,9 @@ const MEMBERS_INITIAL: MembersState = { status: 'idle', error: null, owner: '', 
 /**
  * The clients-page read lifecycle: the client master (S-CORE-01), the filing
  * obligation ledger (S-COMPL-01), the current year's compliance schedule, the
- * signature-delivery ledger (S-DELIV-01), and the follow-up center
- * (S-FOLLOW-01), all served by the host workbench Remote.
+ * signature-delivery ledger (S-DELIV-01), the follow-up center (S-FOLLOW-01),
+ * and the business monthly report (S-RPT-01) for the selected month, all
+ * served by the host workbench Remote.
  */
 export interface ClientsState {
   /** Read lifecycle of the clients page. */
@@ -275,10 +317,22 @@ export interface ClientsState {
   deliveries: readonly WorkbenchDelivery[]
   /** The follow-up center's actionable rows, most urgent rung first. */
   followUps: readonly WorkbenchFollowUp[]
+  /** The month the report section reads, `YYYY-MM`. */
+  reportMonth: string
+  /** The business monthly report for {@link reportMonth}, or null until the first read. */
+  report: WorkbenchMonthlyReport | null
+}
+
+/** The current UTC month, `YYYY-MM`; the report section's default period. */
+function currentUtcMonth(): string {
+  const now = new Date()
+  const month = String(now.getUTCMonth() + 1).padStart(2, '0')
+  return `${now.getUTCFullYear()}-${month}`
 }
 
 const CLIENTS_INITIAL: ClientsState = {
   status: 'idle', error: null, clients: [], obligations: [], schedule: null, deliveries: [], followUps: [],
+  reportMonth: currentUtcMonth(), report: null,
 }
 
 /**
@@ -520,6 +574,24 @@ export class WorkbenchController {
   }
 
   /**
+   * Install the session-switch watcher once, after the sessions service is
+   * available. Selecting a different session as current — from the sidebar's
+   * session list, a subagent catalog, or an auto-opened child — returns the
+   * frame to the conversation (3088 work-mode parity), so an open workbench
+   * page folds away. The page's own open-session actions close it first;
+   * same-current emissions and row updates change nothing.
+   */
+  watchSessionSwitch(): void {
+    let current = this.ctx.sessions.list.getSnapshot().current
+    this.ctx.sessions.list.subscribe(() => {
+      const next = this.ctx.sessions.list.getSnapshot().current
+      if (next === current) return
+      current = next
+      this.closePage()
+    })
+  }
+
+  /**
    * Load the roster, the caller's binding, and derive the team states. An
    * empty roster is a valid deployment (the Host composition only), reported
    * as `unavailable`.
@@ -690,25 +762,28 @@ export class WorkbenchController {
 
   /**
    * Read the client master, the obligation ledger, the current year's
-   * schedule, the delivery ledger, and the follow-up center into the
-   * clients-page snapshot. Every write below re-reads the same quintuple, so
-   * the page never derives what the host already decided.
+   * schedule, the delivery ledger, the follow-up center, and the monthly
+   * business report into the clients-page snapshot. Every write below re-reads
+   * the same sextuple, so the page never derives what the host already decided
+   * and the report section stays fresh after every mutation.
    */
   async loadClients(): Promise<void> {
     const keep = this.clients.getSnapshot()
     this.clients.set({ ...keep, status: 'loading', error: null })
-    const [master, ledger, schedule, deliveries, followUps] = await Promise.all([
+    const [master, ledger, schedule, deliveries, followUps, report] = await Promise.all([
       this.ctx.remote.workbench.clients(),
       this.ctx.remote.workbench.obligations(),
       this.ctx.remote.workbench.complianceSchedule(),
       this.ctx.remote.workbench.deliveries(),
       this.ctx.remote.workbench.followUps(),
+      this.ctx.remote.workbench.monthlyReport(keep.reportMonth),
     ])
-    if (!master.ok || !ledger.ok || !schedule.ok || !deliveries.ok || !followUps.ok) {
-      const failure = [master, ledger, schedule, deliveries, followUps].find(read => !read.ok)
+    if (!master.ok || !ledger.ok || !schedule.ok || !deliveries.ok || !followUps.ok || !report.ok) {
+      const failure = [master, ledger, schedule, deliveries, followUps, report].find(read => !read.ok)
       this.clients.set({
         status: 'error', error: failure?.error.message ?? 'unknown failure',
         clients: [], obligations: [], schedule: null, deliveries: [], followUps: [],
+        reportMonth: keep.reportMonth, report: null,
       })
       return
     }
@@ -720,7 +795,19 @@ export class WorkbenchController {
       schedule: schedule.value,
       deliveries: deliveries.value.deliveries,
       followUps: followUps.value.followUps,
+      reportMonth: report.value.month,
+      report: report.value,
     })
+  }
+
+  /**
+   * Switch the report section's month and re-read the page, so the report for
+   * the new month comes back from the host rather than being derived here.
+   * @param month - the month to read, `YYYY-MM`.
+   */
+  async setReportMonth(month: string): Promise<void> {
+    this.clients.set({ ...this.clients.getSnapshot(), reportMonth: month })
+    await this.loadClients()
   }
 
   /**

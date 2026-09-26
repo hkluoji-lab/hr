@@ -126,8 +126,8 @@ describe('WorkbenchDashboard hero copy', () => {
   })
 
   it('appends the bound roles to the greeting and stays silent for visitors', () => {
-    const bound = setup({ ...READY, my: { name: null, roles: ['secretary', 'audit'], isOwner: false } }, 10)
-    const roles = zh['greeting.roles'].replace('{roles}', 'AI 秘书 · AI 审计')
+    const bound = setup({ ...READY, my: { name: null, roles: ['admin', 'marketing'], isOwner: false } }, 10)
+    const roles = zh['greeting.roles'].replace('{roles}', 'AI 行政 · AI 营销')
     expect(screen.getByText(roles)).toBeTruthy()
     bound.unmount()
 
@@ -218,19 +218,19 @@ describe('WorkbenchDashboard team cards', () => {
       ...READY,
       members: [
         member({ id: 'standard', name: '标准模式' }),
-        roleMember('audit', 'AI 审计'),
-        roleMember('secretary', 'AI 秘书'),
-        roleMember('accountant', 'AI 会计'),
+        roleMember('marketing', 'AI 营销'),
+        roleMember('admin', 'AI 行政'),
+        roleMember('finance', 'AI 财务'),
         roleMember('legal', 'AI 法务'),
       ],
     }
     setup(roleState, 10)
     expect(screen.queryByText('标准模式')).toBeNull()
-    const cards = screen.getAllByText(/^AI (秘书|会计|法务|审计)$/).map(node => node.textContent)
-    expect(cards).toEqual(['AI 秘书', 'AI 会计', 'AI 法务', 'AI 审计'])
+    const cards = screen.getAllByText(/^AI (财务|法务|行政|营销)$/).map(node => node.textContent)
+    expect(cards).toEqual(['AI 财务', 'AI 法务', 'AI 行政', 'AI 营销'])
     // Every role card renders its capability tags.
-    expect(screen.getByText(zh['role.secretary.tag.service'])).toBeTruthy()
-    expect(screen.getByText(zh['role.audit.tag.report'])).toBeTruthy()
+    expect(screen.getByText(zh['role.admin.tag.chase'])).toBeTruthy()
+    expect(screen.getByText(zh['role.marketing.tag.review'])).toBeTruthy()
   })
 
   it('disables offline members so their preset cannot be started', () => {

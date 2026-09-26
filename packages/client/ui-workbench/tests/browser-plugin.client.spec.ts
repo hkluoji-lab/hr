@@ -248,7 +248,7 @@ describe('ui-workbench browser half', () => {
     await shell.load()
     await shell.loadLedger()
     await shell.loadMembers()
-    expect(await shell.createInvite(['accountant'])).toMatchObject({ ok: true, code: 'stub-code' })
+    expect(await shell.createInvite(['finance'])).toMatchObject({ ok: true, code: 'stub-code' })
     expect(await shell.unbindMember('13800138000')).toBeNull()
     shell.openSession('s1' as SessionId)
     shell.startWithPreset('minimal')

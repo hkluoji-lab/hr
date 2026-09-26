@@ -2,12 +2,14 @@
  * The workbench page surface: one `shell.overlay` entry rendering whichever
  * page the sidebar nav opened — the task hall, the task assistant, the active
  * tasks, the secretary-company clients page, the AI team, the month report, or
- * the owner's member management — over the whole frame. Closed state renders
+ * the owner's member management — beside the frame's sidebar, which stays
+ * visible and clickable (the 3088 conversation work mode). Closed state renders
  * null, so the overlay layer stays click-through until a page is open. Escape
  * and the header's close control both dismiss. The members page renders only
  * for the deployment owner.
  */
-import { useEffect, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import type { RefObject } from 'react'
 import { IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -107,8 +109,12 @@ export interface WorkbenchShellInjected {
   removeDelivery: (id: string) => Promise<MutationOutcome>
   /** Log one follow-up reminder against an open delivery or obligation. */
   recordFollowUp: (payload: WorkbenchFollowUpCreate) => Promise<MutationOutcome>
+  /** Switch the monthly report's month and re-read the page. */
+  setReportMonth: (month: string) => Promise<void>
   /** Close the open page. */
   close: () => void
+  /** Start a fresh default-composition task and leave the page. */
+  startTask: () => void
   /** Select a session as current and leave the page. */
   openSession: (id: SessionId) => void
   /** Start a session composed for one member's preset, then leave the page. */
@@ -155,16 +161,65 @@ export function createTaskRowsHook(ctx: ClientContext): () => readonly TaskRow[]
 }
 
 /**
+ * The sidebar-tracked left offset of the open page: the frame's first grid
+ * track width, so the page starts at the sidebar's right edge and the sidebar
+ * stays visible and clickable behind it. The page edge rides the track's
+ * animated width (collapse, rail, drag) by observing the sidebar column, whose
+ * per-frame resize drives a rAF-throttled re-measure of the resolved
+ * `grid-template-columns`. A bare render (tests, unexpected DOM) keeps the
+ * full-bleed fallback at 0.
+ * @param open - the currently open page, or null when closed.
+ * @returns the page root ref and the left offset in px.
+ */
+function useSidebarOffset(open: WorkbenchPageId | null): { rootRef: RefObject<HTMLDivElement>; offset: number } {
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  const [offset, setOffset] = useState(0)
+  useLayoutEffect(() => {
+    if (open === null) return
+    // The page root's ancestors are the slot wrapper → the overlay layer → the
+    // frame (AppFrame's grid). The frame is the nearest ancestor whose grid
+    // resolves to a multi-track column layout, so finding it by layout rather
+    // than a fixed hop count survives slot-wrapper changes.
+    let frame = rootRef.current?.parentElement ?? null
+    while (frame !== null && frame !== document.body) {
+      if (getComputedStyle(frame).gridTemplateColumns.split(' ').length > 1) break
+      frame = frame.parentElement
+    }
+    if (frame === null || frame === document.body) return
+    let raf: number | null = null
+    const measure = (): void => {
+      const first = Number.parseFloat(getComputedStyle(frame).gridTemplateColumns)
+      setOffset(Number.isFinite(first) ? first : 0)
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => {
+      raf ??= requestAnimationFrame(() => {
+        raf = null
+        measure()
+      })
+    })
+    const sidebar = frame.firstElementChild
+    if (sidebar !== null) observer.observe(sidebar)
+    return () => {
+      observer.disconnect()
+      if (raf !== null) cancelAnimationFrame(raf)
+    }
+  }, [open])
+  return { rootRef, offset }
+}
+
+/**
  * Render the workbench page surface.
  * @param props - the page stores plus the page actions.
  * @returns the page element tree, or null while no page is open.
  */
 export function WorkbenchShell({
   usePages, useWorkbench, useLedger, useMembers, useClients, useTasks,
-  load, loadLedger, loadMembers, loadClients, close, openSession, startWithPreset, assignTask,
+  load, loadLedger, loadMembers, loadClients, close, startTask, openSession, startWithPreset, assignTask,
   grantCredits, createInvite, unbindMember, assignMember, deleteAccount,
   addClient, removeClient, addObligation, markObligation, removeObligation,
-  addDelivery, markDelivery, removeDelivery, recordFollowUp, t,
+  addDelivery, markDelivery, removeDelivery, recordFollowUp, setReportMonth, t,
 }: WorkbenchShellProps) {
   const open = usePages(snapshot => snapshot.open)
   const team = useWorkbench(snapshot => snapshot)
@@ -172,13 +227,14 @@ export function WorkbenchShell({
   const roster = useMembers(snapshot => snapshot)
   const clientsPage = useClients(snapshot => snapshot)
   const tasks = useTasks()
+  const { rootRef, offset } = useSidebarOffset(open)
 
   useEffect(() => {
     if (open === null) return
     void load()
     if (open === 'report') void loadLedger()
     if (open === 'members') void loadMembers()
-    if (open === 'clients') void loadClients()
+    if (open === 'clients' || open === 'team') void loadClients()
   }, [open, load, loadLedger, loadMembers, loadClients])
 
   useEffect(() => {
@@ -194,7 +250,13 @@ export function WorkbenchShell({
 
   const now = Date.now()
   return (
-    <div className={css.root} role="region" aria-label={t(TITLES[open])}>
+    <div
+      ref={rootRef}
+      className={css.root}
+      role="region"
+      aria-label={t(TITLES[open])}
+      style={{ left: offset }}
+    >
       <header className={css.header}>
         <div className={css.heading}>
           <h2 className={css.title}>{t(TITLES[open])}</h2>
@@ -207,7 +269,14 @@ export function WorkbenchShell({
       </header>
       <div className={css.body}>
         {open === 'hall' && (
-          <TaskHallPage tasks={tasks} members={team.members} now={now} onOpen={openSession} t={t} />
+          <TaskHallPage
+            tasks={tasks}
+            members={team.members}
+            now={now}
+            onOpen={openSession}
+            onStartTask={startTask}
+            t={t}
+          />
         )}
         {open === 'active' && (
           <TaskHallPage
@@ -215,6 +284,7 @@ export function WorkbenchShell({
             members={team.members}
             now={now}
             onOpen={openSession}
+            onStartTask={startTask}
             emptyKey="active.empty"
             t={t}
           />
@@ -234,11 +304,12 @@ export function WorkbenchShell({
             onMarkDelivery={markDelivery}
             onRemoveDelivery={removeDelivery}
             onRecordFollowUp={recordFollowUp}
+            onSetReportMonth={setReportMonth}
             t={t}
           />
         )}
         {open === 'team' && (
-          <TeamPage state={team} onStart={startWithPreset} t={t} />
+          <TeamPage state={team} clients={clientsPage} onStart={startWithPreset} onAction={assignTask} t={t} />
         )}
         {open === 'report' && (
           <ReportPage

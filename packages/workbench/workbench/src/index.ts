@@ -48,10 +48,12 @@ import {
 } from './spec.ts'
 import type {
   WorkbenchClient, WorkbenchClientCreate, WorkbenchClientCreated, WorkbenchClientList,
-  WorkbenchCreditEntry, WorkbenchCreditGrant, WorkbenchDelivery, WorkbenchDeliveryChannel, WorkbenchDeliveryCreate,
+  WorkbenchClientHealth, WorkbenchComplianceStatus, WorkbenchCreditEntry, WorkbenchCreditGrant,
+  WorkbenchDelivery, WorkbenchDeliveryChannel, WorkbenchDeliveryCreate,
   WorkbenchDeliveryList, WorkbenchDeliveryStatus, WorkbenchDueTier, WorkbenchFollowUp, WorkbenchFollowUpCreate,
   WorkbenchFollowUpList, WorkbenchFollowUpTargetKind, WorkbenchLedger,
-  WorkbenchMember, WorkbenchMemberStatus, WorkbenchObligation, WorkbenchObligationCreate,
+  WorkbenchMember, WorkbenchMemberStatus, WorkbenchMonthlyReport,
+  WorkbenchObligation, WorkbenchObligationCreate,
   WorkbenchObligationList, WorkbenchObligationStatus, WorkbenchReminderLogged,
   WorkbenchReminderTier, WorkbenchSchedule, WorkbenchScheduleRow,
   WorkbenchSnapshot,
@@ -61,11 +63,11 @@ export { workbenchDomainSpec, MAX_REASON_LENGTH } from './spec.ts'
 export type { CreditEntryRecord, CreditsState, DeliveryRecord, ReminderRecord } from './spec.ts'
 export type {
   WorkbenchClient, WorkbenchClientCreate, WorkbenchClientCreated, WorkbenchClientList,
-  WorkbenchComplianceStatus, WorkbenchCredits, WorkbenchCreditEntry, WorkbenchCreditGrant,
+  WorkbenchClientHealth, WorkbenchComplianceStatus, WorkbenchCredits, WorkbenchCreditEntry, WorkbenchCreditGrant,
   WorkbenchDelivery, WorkbenchDeliveryChannel, WorkbenchDeliveryCreate, WorkbenchDeliveryList,
   WorkbenchDeliveryStatus, WorkbenchDueTier, WorkbenchFollowUp, WorkbenchFollowUpCreate,
   WorkbenchFollowUpList, WorkbenchFollowUpTargetKind, WorkbenchFollowUpTier, WorkbenchLedger,
-  WorkbenchMember, WorkbenchMemberStatus,
+  WorkbenchMember, WorkbenchMemberStatus, WorkbenchMonthlyReport,
   WorkbenchObligation, WorkbenchObligationCreate, WorkbenchObligationKind,
   WorkbenchObligationList, WorkbenchObligationStatus, WorkbenchReminder, WorkbenchReminderLogged,
   WorkbenchReminderTier, WorkbenchSchedule, WorkbenchScheduleRow,
@@ -130,6 +132,9 @@ export const REMINDER_SEVERITY_RANKS: Record<WorkbenchReminderTier, number> = {
 
 /** Milliseconds in one UTC day; the date arithmetic every deadline read uses. */
 const MILLIS_PER_DAY = 86_400_000
+
+/** `YYYY-MM` calendar month as the wire format for a report period (S-RPT-01). */
+export const MONTH_PATTERN = /^\d{4}-(?:0[1-9]|1[0-2])$/
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -609,6 +614,129 @@ export class Workbench extends TypertRemoteService {
   }
 
   /**
+   * The Remote monthly business report (S-RPT-01): the client, filing,
+   * delivery, and reminder tallies inside one month beside the live
+   * per-client health fold. The month defaults to the current UTC month;
+   * month-window counts cover records created in the month, the delivery
+   * split is the current lifecycle of the month's cohort, the open/overdue
+   * filing counts are current snapshots, and health derives from the two
+   * ladders the ledgers already encode.
+   * @param month - the report month, `YYYY-MM`; defaults to the current month.
+   * @returns the report for that month, health rows worst first.
+   * @throws RemoteError `gateway/bad-request` when the month is malformed.
+   */
+  @Remote('monthlyReport')
+  async remoteMonthlyReport(month?: string): Promise<WorkbenchMonthlyReport> {
+    const period = month ?? isoMonthOf(new Date())
+    if (!MONTH_PATTERN.test(period)) {
+      throw new RemoteError('gateway/bad-request', 'workbench: month must be a YYYY-MM month', {})
+    }
+    const year = Number(period.slice(0, 4))
+    const monthNumber = Number(period.slice(5, 7))
+    const start = Date.UTC(year, monthNumber - 1, 1)
+    const end = Date.UTC(monthNumber === 12 ? year + 1 : year, monthNumber === 12 ? 0 : monthNumber, 1)
+    const today = new Date()
+
+    let totalClients = 0
+    let newClients = 0
+    for (const [, record] of this.requireClients().entries()) {
+      totalClients += 1
+      if (record.createdAt >= start && record.createdAt < end) newClients += 1
+    }
+
+    let recordedObligations = 0
+    let openObligations = 0
+    let overdueObligations = 0
+    // Per-client health inputs folded from the two ledgers.
+    const filings = new Map<string, { open: number; overdue: number; urgent: number }>()
+    for (const [, record] of this.requireObligations().entries()) {
+      if (record.createdAt >= start && record.createdAt < end) recordedObligations += 1
+      if (record.status !== 'open') continue
+      openObligations += 1
+      const dueTier = dueMetaOf(record.dueDate, today).dueTier
+      const overdue = dueTier === 'overdue'
+      if (overdue) overdueObligations += 1
+      const seen = filings.get(record.clientId) ?? { open: 0, overdue: 0, urgent: 0 }
+      seen.open += 1
+      if (overdue) seen.overdue += 1
+      if (dueTier === 'd1' || dueTier === 'd7') seen.urgent += 1
+      filings.set(record.clientId, seen)
+    }
+
+    let sentDeliveries = 0
+    let signedDeliveries = 0
+    let returnedDeliveries = 0
+    let openDeliveries = 0
+    const chasing = new Map<string, { total: number; escalated: number }>()
+    for (const [, record] of this.requireDeliveries().entries()) {
+      if (record.createdAt >= start && record.createdAt < end) {
+        sentDeliveries += 1
+        if (record.status === 'signed') signedDeliveries += 1
+        else if (record.status === 'returned') returnedDeliveries += 1
+        else openDeliveries += 1
+      }
+      if (record.status === 'signed' || record.status === 'returned') continue
+      const tier = followUpMetaOf(record.createdAt, today).followUpTier
+      if (tier === 'fresh') continue
+      const seen = chasing.get(record.clientId) ?? { total: 0, escalated: 0 }
+      seen.total += 1
+      if (tier === 'escalate') seen.escalated += 1
+      chasing.set(record.clientId, seen)
+    }
+
+    const byChannel: Record<WorkbenchDeliveryChannel, number> = { email: 0, wechat: 0, whatsapp: 0 }
+    const byTier: Record<WorkbenchReminderTier, number> = {
+      nudge: 0, chase: 0, escalate: 0, d30: 0, d15: 0, d7: 0, d1: 0, overdue: 0,
+    }
+    let totalReminders = 0
+    const remindersByClient = new Map<string, number>()
+    for (const [, record] of this.requireReminders().entries()) {
+      if (record.createdAt < start || record.createdAt >= end) continue
+      totalReminders += 1
+      byChannel[record.channel] += 1
+      byTier[record.tier] += 1
+      const clientId = record.targetKind === 'delivery'
+        ? this.requireDeliveries().get(record.targetId)?.clientId
+        : this.requireObligations().get(record.targetId)?.clientId
+      if (clientId !== undefined) remindersByClient.set(clientId, (remindersByClient.get(clientId) ?? 0) + 1)
+    }
+
+    const health: WorkbenchClientHealth[] = []
+    for (const [id, record] of this.requireClients().entries()) {
+      const filed = filings.get(id) ?? { open: 0, overdue: 0, urgent: 0 }
+      const chased = chasing.get(id) ?? { total: 0, escalated: 0 }
+      const healthState: WorkbenchComplianceStatus
+        = filed.overdue > 0 || chased.escalated > 0 ? 'red'
+          : chased.total > 0 || filed.urgent > 0 ? 'yellow'
+            : 'green'
+      health.push({
+        clientId: id,
+        clientNameCn: record.nameCn,
+        openFilings: filed.open,
+        overdueFilings: filed.overdue,
+        chasingDeliveries: chased.total,
+        remindersInMonth: remindersByClient.get(id) ?? 0,
+        health: healthState,
+      })
+    }
+    const healthRank: Record<WorkbenchComplianceStatus, number> = { red: 0, yellow: 1, green: 2 }
+    health.sort((left, right) =>
+      healthRank[left.health] - healthRank[right.health]
+      || left.clientNameCn.localeCompare(right.clientNameCn))
+
+    return Promise.resolve({
+      month: period,
+      clients: { total: totalClients, newInMonth: newClients },
+      obligations: { recordedInMonth: recordedObligations, open: openObligations, overdue: overdueObligations },
+      deliveries: {
+        sent: sentDeliveries, signed: signedDeliveries, returned: returnedDeliveries, open: openDeliveries,
+      },
+      reminders: { total: totalReminders, byChannel, byTier },
+      health,
+    })
+  }
+
+  /**
    * The Remote schedule read: the current year's statutory-filing outlook.
    * Stored obligations due in the year are authoritative; every client whose
    * incorporation anniversary falls in the year also gets a projected NAR1 row
@@ -821,6 +949,12 @@ function isoDateOf(date: Date): string {
   const month = String(date.getUTCMonth() + 1).padStart(2, '0')
   const day = String(date.getUTCDate()).padStart(2, '0')
   return `${date.getUTCFullYear()}-${month}-${day}`
+}
+
+/** The UTC calendar month as `YYYY-MM`; the monthly report's default period. */
+function isoMonthOf(date: Date): string {
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  return `${date.getUTCFullYear()}-${month}`
 }
 
 /**
